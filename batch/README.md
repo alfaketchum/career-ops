@@ -2,6 +2,47 @@
 
 Process multiple job offers in parallel via `claude -p` workers. Each worker runs the full evaluation pipeline (A-F report + PDF + tracker line) autonomously.
 
+## Two-Pass Workflow (Recommended for Spray-and-Pray)
+
+When you have hundreds of URLs from a scan, don't deep-evaluate every single one.
+Use the two-pass approach:
+
+### Pass 1 — SCREEN (Haiku 4.5, fast + cheap)
+
+Scores every URL on 4 dimensions (role fit, experience match, remote, red flags).
+No WebSearch, no PDF, no interview prep. ~30s per offer.
+
+```bash
+bash batch/batch-runner.sh --screen --parallel 5
+```
+
+### Select top candidates
+
+Pick the top N scored offers for deep evaluation:
+
+```bash
+node batch/select-top.mjs --top 20 --min-score 3.5
+# Writes batch/batch-input-deep.tsv with the top 20 offers
+```
+
+### Pass 2 — DEEP (Sonnet 4.5 or Opus, full quality)
+
+Full A-G evaluation, WebSearch for comp/culture, tailored PDF CV:
+
+```bash
+cp batch/batch-input-deep.tsv batch/batch-input.tsv
+rm -f batch/batch-state.tsv  # reset state for new batch
+bash batch/batch-runner.sh --parallel 3
+
+# Or for max quality on the few you'll actually apply to:
+CLAUDE_MODEL=claude-opus-4-5 bash batch/batch-runner.sh
+```
+
+**Cost comparison on 150 URLs:**
+- All-Opus single pass: ~$40-60
+- Sonnet single pass: ~$15-20
+- Two-pass (Haiku screen + Opus top-20): ~$8-12 — best value
+
 ## Quick Start
 
 1. **Add offers** to `batch-input.tsv` (tab-separated: `id`, `url`, `source`, `notes`):

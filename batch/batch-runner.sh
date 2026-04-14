@@ -28,13 +28,16 @@ RETRY_FAILED=false
 START_FROM=0
 MAX_RETRIES=2
 MIN_SCORE=0
+SCREEN_MODE=false
 
 usage() {
   cat <<'USAGE'
 career-ops batch runner — process job offers in batch via claude -p workers
-Uses your default Claude model (Claude Max subscription).
+Default model: Sonnet 4.5 (override with CLAUDE_MODEL env var).
 
 Usage: batch-runner.sh [OPTIONS]
+       CLAUDE_MODEL=claude-haiku-4-5 batch-runner.sh   # cheapest, fastest
+       CLAUDE_MODEL=claude-opus-4-5 batch-runner.sh    # best quality
 
 Options:
   --parallel N         Number of parallel workers (default: 1)
@@ -43,6 +46,8 @@ Options:
   --start-from N       Start from offer ID N (skip earlier IDs)
   --max-retries N      Max retry attempts per offer (default: 2)
   --min-score N        Skip PDF/tracker for offers scoring below N (default: 0 = off)
+  --screen             Fast lightweight pass (Haiku + no WebSearch + no PDF).
+                       Recommended for pass 1 of spray-and-pray workflow.
   -h, --help           Show this help
 
 Files:
@@ -76,6 +81,7 @@ while [[ $# -gt 0 ]]; do
     --start-from) START_FROM="$2"; shift 2 ;;
     --max-retries) MAX_RETRIES="$2"; shift 2 ;;
     --min-score) MIN_SCORE="$2"; shift 2 ;;
+    --screen) SCREEN_MODE=true; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -112,6 +118,12 @@ check_prerequisites() {
   if [[ ! -f "$INPUT_FILE" ]]; then
     echo "ERROR: $INPUT_FILE not found. Add offers first."
     exit 1
+  fi
+
+  # Switch prompt file based on mode
+  if [[ "$SCREEN_MODE" == "true" ]]; then
+    PROMPT_FILE="$BATCH_DIR/batch-prompt-screen.md"
+    echo "Mode: SCREEN (Haiku 4.5, no WebSearch, no PDF)"
   fi
 
   if [[ ! -f "$PROMPT_FILE" ]]; then
@@ -350,9 +362,16 @@ process_offer() {
     -e "s|{{ID}}|${esc_id}|g" \
     "$PROMPT_FILE" > "$resolved_prompt"
 
-  # Launch claude -p worker (uses default model from Claude Max subscription)
+  # Select model: screen mode = Haiku (fast/cheap), otherwise Sonnet (balanced)
+  # Override either with CLAUDE_MODEL env var.
+  local default_model="claude-sonnet-4-5"
+  if [[ "$SCREEN_MODE" == "true" ]]; then
+    default_model="claude-haiku-4-5"
+  fi
+  local model="${CLAUDE_MODEL:-$default_model}"
   local exit_code=0
   claude -p \
+    --model "$model" \
     --dangerously-skip-permissions \
     --append-system-prompt-file "$resolved_prompt" \
     "$prompt" \
