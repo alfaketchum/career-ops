@@ -1,0 +1,81 @@
+# Career-Ops Profile Configuration
+
+candidate:
+  full_name: "Ajay Shah"
+  email: "Ajay.Shah51095@gmail.com"
+  phone: "201-208-4428"
+  location: "NYC / NJ / Remote"
+  linkedin: "linkedin.com/in/0xajk"
+
+target_roles:
+  primary:
+    - "Financial Analyst"
+    - "Credit Analyst"
+    - "Business Analyst"
+    - "Strategy Analyst"
+  archetypes:
+    - name: "Financial Analyst"
+      level: "Mid-Senior"
+      fit: "primary"
+    - name: "Credit Analyst"
+      level: "Senior"
+      fit: "primary"
+    - name: "Business/Strategy Analyst"
+      level: "Mid-Senior"
+      fit: "primary"
+    - name: "Portfolio Analyst / Risk Analyst"
+      level: "Mid-Senior"
+      fit: "secondary"
+    - name: "Business Development / Partnerships"
+      level: "Mid-Senior"
+      fit: "adjacent"
+    - name: "Operations / Program Manager"
+      level: "Mid-Senior"
+      fit: "adjacent"
+
+narrative:
+  headline: "Finance professional with credit, portfolio management, and startup leadership experience"
+  exit_story: >
+    Started in corporate finance at J&J, built deep credit analysis expertise at Moody's,
+    then went entrepreneurial — managing a $50M digital assets portfolio and co-founding a
+    DeFi startup. Now looking for a stable remote role that leverages my analytical foundation
+    while I build my next venture on the side.
+  superpowers:
+    - "Chameleon — can credibly operate across credit, portfolio mgmt, strategy, BD, and ops"
+    - "Quantitative rigor from Moody's + scrappy execution from startup life"
+    - "Capital raising and investor relations ($500K pre-seed, $50M portfolio)"
+  proof_points:
+    - name: "Sophon Ecosystem"
+      hero_metric: "Sourced and incubated 20+ projects, distributed $2M+ in grants"
+    - name: "Limitless Labs"
+      url: "https://limitlessfi.app/"
+      hero_metric: "Raised $500K pre-seed @ $10M valuation"
+    - name: "Aligned Co. Portfolio"
+      hero_metric: "173.7% absolute return on ~$50M digital assets portfolio"
+    - name: "Moody's Rosetta Stone"
+      hero_metric: "Built data-querying tool saving 100+ hours/year, Culture of Excellence award"
+    - name: "J&J Expense Tracking"
+      hero_metric: "New tracking system saved $3.5M (15% y-o-y)"
+
+  # Context: Ajay is currently at Sophon (Business Strategy Manager) and wants
+  # a remote "coast" role to pay bills while focusing on his startup.
+  # Spray-and-pray strategy given non-linear background.
+  job_search_context: >
+    Spray-and-pray strategy — wide net given chameleon profile.
+    Ideal role: stable, durable business (like Moody's), paper-pushing, remote.
+    Open to: fintech, crypto, traditional finance, tech, influencer marketing.
+    Company size: 100+ employees (no tiny startups).
+    Gap (June 2024 - April 2025): Traveled Europe, MBA prep.
+    Non-linear background is both a strength (versatility) and a challenge (hard to categorize).
+
+compensation:
+  target_range: "$80K-170K"
+  currency: "USD"
+  minimum: "$80K"
+  location_flexibility: "Remote only"
+
+location:
+  country: "United States"
+  city: "NYC / NJ area"
+  timezone: "EST"
+  visa_status: "No sponsorship needed"
