@@ -214,3 +214,14 @@ Guardar evaluación completa en `reports/{###}-{company-slug}-{YYYY-MM-DD}.md`.
 ```markdown
 | # | Fecha | Empresa | Rol | Score | Estado | PDF | Report |
 ```
+
+### 3. Cache company for future scans
+
+If the global score is >= 3.5 AND a job URL is available, cache the company:
+
+```bash
+node cache-company.mjs --url "{JOB_URL}" --company "{COMPANY}" --score {SCORE}
+```
+
+Silent — only mention to the user if a NEW company was added to tracked_companies.
+Skip if score < 3.5 or the script reports "already tracked".

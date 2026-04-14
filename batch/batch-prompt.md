@@ -322,6 +322,16 @@ Formato TSV (una sola línea, sin header, 9 columnas tab-separated):
 
 Donde `{next_num}` se calcula leyendo la última línea de `data/applications.md`.
 
+### Paso 5.5 — Cache company
+
+If score >= 3.5, cache the company for future direct scanning:
+
+```bash
+node cache-company.mjs --url "{JOB_URL}" --company "{COMPANY}" --score {SCORE}
+```
+
+Silent — do not interrupt batch flow. Only include in JSON output if a NEW company was added.
+
 ### Paso 6 — Output final
 
 Al terminar, imprime por stdout un resumen JSON para que el orquestador lo parsee:

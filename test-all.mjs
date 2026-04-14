@@ -295,6 +295,110 @@ if (fileExists('VERSION')) {
   fail('VERSION file missing');
 }
 
+// ── 11. CACHE-COMPANY LOGIC ────────────────────────────────────────
+
+console.log('\n11. cache-company.mjs');
+
+try {
+  const { inferCompanyFromUrl, isAlreadyTracked } = await import(pathToFileURL(join(ROOT, 'cache-company.mjs')).href);
+
+  // Ashby detection
+  const ashby = inferCompanyFromUrl('https://jobs.ashbyhq.com/cohere/abc123-def');
+  if (ashby && ashby.atsType === 'ashby' && ashby.slug === 'cohere' && ashby.careersUrl === 'https://jobs.ashbyhq.com/cohere') {
+    pass('inferCompanyFromUrl: Ashby detection');
+  } else {
+    fail(`inferCompanyFromUrl: Ashby detection — got ${JSON.stringify(ashby)}`);
+  }
+
+  // Lever detection
+  const lever = inferCompanyFromUrl('https://jobs.lever.co/mistral/xyz789');
+  if (lever && lever.atsType === 'lever' && lever.slug === 'mistral') {
+    pass('inferCompanyFromUrl: Lever detection');
+  } else {
+    fail(`inferCompanyFromUrl: Lever detection — got ${JSON.stringify(lever)}`);
+  }
+
+  // Greenhouse detection
+  const gh = inferCompanyFromUrl('https://job-boards.greenhouse.io/anthropic/jobs/12345');
+  if (gh && gh.atsType === 'greenhouse' && gh.slug === 'anthropic') {
+    pass('inferCompanyFromUrl: Greenhouse detection');
+  } else {
+    fail(`inferCompanyFromUrl: Greenhouse detection — got ${JSON.stringify(gh)}`);
+  }
+
+  // Greenhouse EU detection
+  const ghEu = inferCompanyFromUrl('https://job-boards.eu.greenhouse.io/polyai/jobs/999');
+  if (ghEu && ghEu.atsType === 'greenhouse' && ghEu.slug === 'polyai') {
+    pass('inferCompanyFromUrl: Greenhouse EU detection');
+  } else {
+    fail(`inferCompanyFromUrl: Greenhouse EU detection — got ${JSON.stringify(ghEu)}`);
+  }
+
+  // BambooHR detection
+  const bamboo = inferCompanyFromUrl('https://acme.bamboohr.com/careers/42/detail');
+  if (bamboo && bamboo.atsType === 'bamboohr' && bamboo.slug === 'acme') {
+    pass('inferCompanyFromUrl: BambooHR detection');
+  } else {
+    fail(`inferCompanyFromUrl: BambooHR detection — got ${JSON.stringify(bamboo)}`);
+  }
+
+  // Teamtailor detection
+  const tt = inferCompanyFromUrl('https://acme.teamtailor.com/jobs/123-analyst');
+  if (tt && tt.atsType === 'teamtailor' && tt.slug === 'acme') {
+    pass('inferCompanyFromUrl: Teamtailor detection');
+  } else {
+    fail(`inferCompanyFromUrl: Teamtailor detection — got ${JSON.stringify(tt)}`);
+  }
+
+  // Unknown URL returns atsType 'unknown' (not null)
+  const unknown = inferCompanyFromUrl('https://careers.acme.com/jobs/analyst');
+  if (unknown && unknown.atsType === 'unknown' && unknown.careersUrl === 'https://careers.acme.com') {
+    pass('inferCompanyFromUrl: unknown URL returns origin');
+  } else {
+    fail(`inferCompanyFromUrl: unknown URL — got ${JSON.stringify(unknown)}`);
+  }
+
+  // Invalid URL returns null
+  const invalid = inferCompanyFromUrl('not-a-url');
+  if (invalid === null) {
+    pass('inferCompanyFromUrl: invalid URL returns null');
+  } else {
+    fail(`inferCompanyFromUrl: invalid URL — got ${JSON.stringify(invalid)}`);
+  }
+
+  // isAlreadyTracked: name match (case-insensitive)
+  const tracked = [{ name: 'Cohere', careers_url: 'https://jobs.ashbyhq.com/cohere' }];
+  if (isAlreadyTracked(tracked, { name: 'cohere', careersUrl: 'https://other.com' })) {
+    pass('isAlreadyTracked: name match case-insensitive');
+  } else {
+    fail('isAlreadyTracked: name match case-insensitive');
+  }
+
+  // isAlreadyTracked: URL match with trailing slash
+  if (isAlreadyTracked(tracked, { name: 'Other', careersUrl: 'https://jobs.ashbyhq.com/cohere/' })) {
+    pass('isAlreadyTracked: URL match with trailing slash');
+  } else {
+    fail('isAlreadyTracked: URL match with trailing slash');
+  }
+
+  // isAlreadyTracked: no match
+  if (!isAlreadyTracked(tracked, { name: 'Mistral', careersUrl: 'https://jobs.lever.co/mistral' })) {
+    pass('isAlreadyTracked: no false positive');
+  } else {
+    fail('isAlreadyTracked: no false positive');
+  }
+
+  // isAlreadyTracked: empty array
+  if (!isAlreadyTracked([], { name: 'Cohere', careersUrl: 'https://jobs.ashbyhq.com/cohere' })) {
+    pass('isAlreadyTracked: empty array returns false');
+  } else {
+    fail('isAlreadyTracked: empty array returns false');
+  }
+
+} catch (err) {
+  fail(`cache-company.mjs import/test error: ${err.message}`);
+}
+
 // ── SUMMARY ─────────────────────────────────────────────────────
 
 console.log('\n' + '='.repeat(50));
