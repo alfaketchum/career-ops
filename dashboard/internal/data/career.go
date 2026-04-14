@@ -162,6 +162,94 @@ func ParseApplications(careerOpsPath string) []model.CareerApplication {
 	return apps
 }
 
+// ParsePipelineInbox reads data/pipeline.md and returns all inbox items.
+// Format per line: "- [ ] {url} | {company} | {role}" (pending)
+//                  "- [x] {url} | {company} | {role}" (processed)
+func ParsePipelineInbox(careerOpsPath string) []model.PipelineInboxItem {
+	// Try data/pipeline.md first, then pipeline.md
+	paths := []string{
+		filepath.Join(careerOpsPath, "data", "pipeline.md"),
+		filepath.Join(careerOpsPath, "pipeline.md"),
+	}
+
+	var content []byte
+	var err error
+	for _, p := range paths {
+		content, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return nil
+	}
+
+	items := make([]model.PipelineInboxItem, 0)
+	num := 0
+
+	rePending := regexp.MustCompile(`^- \[([ x])\]\s+(\S+)\s*\|\s*([^|]+?)\s*\|\s*(.+)$`)
+
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
+			continue
+		}
+		m := rePending.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		num++
+		processed := m[1] == "x"
+		url := strings.TrimSpace(m[2])
+		company := strings.TrimSpace(m[3])
+		role := strings.TrimSpace(m[4])
+
+		items = append(items, model.PipelineInboxItem{
+			Number:    num,
+			URL:       url,
+			Company:   company,
+			Role:      role,
+			Source:    detectSource(url),
+			Processed: processed,
+		})
+	}
+
+	return items
+}
+
+// detectSource returns a short label for the job board from a URL.
+func detectSource(rawURL string) string {
+	low := strings.ToLower(rawURL)
+	switch {
+	case strings.Contains(low, "linkedin.com"):
+		return "linkedin"
+	case strings.Contains(low, "glassdoor.com"):
+		return "glassdoor"
+	case strings.Contains(low, "indeed.com"):
+		return "indeed"
+	case strings.Contains(low, "builtin.com"):
+		return "builtin"
+	case strings.Contains(low, "weworkremotely.com"):
+		return "wwr"
+	case strings.Contains(low, "remoteok.com"):
+		return "remoteok"
+	case strings.Contains(low, "cryptojobslist.com"):
+		return "cryptojobs"
+	case strings.Contains(low, "web3.career"):
+		return "web3"
+	case strings.Contains(low, "jobs.ashbyhq.com"):
+		return "ashby"
+	case strings.Contains(low, "jobs.lever.co"):
+		return "lever"
+	case strings.Contains(low, "greenhouse.io"):
+		return "greenhouse"
+	case strings.Contains(low, "flexjobs.com"):
+		return "flexjobs"
+	default:
+		return "other"
+	}
+}
+
 // loadBatchInputURLs reads batch-input.tsv and returns a map of batch ID -> job URL.
 func loadBatchInputURLs(careerOpsPath string) map[string]string {
 	inputPath := filepath.Join(careerOpsPath, "batch", "batch-input.tsv")

@@ -1,5 +1,15 @@
 package model
 
+// PipelineInboxItem represents a pending URL from data/pipeline.md.
+type PipelineInboxItem struct {
+	Number    int
+	URL       string
+	Company   string
+	Role      string
+	Source    string // linkedin, glassdoor, greenhouse, lever, ashby, etc.
+	Processed bool   // true if marked [x], false if [ ]
+}
+
 // CareerApplication represents a single job application from the tracker.
 type CareerApplication struct {
 	Number       int

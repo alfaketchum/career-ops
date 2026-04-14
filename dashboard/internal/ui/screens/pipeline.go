@@ -48,6 +48,9 @@ type PipelineRefreshMsg struct{}
 // PipelineOpenProgressMsg is emitted when the progress screen should open.
 type PipelineOpenProgressMsg struct{}
 
+// PipelineOpenInboxMsg is emitted when the inbox (pending URLs) should open.
+type PipelineOpenInboxMsg struct{}
+
 type reportSummary struct {
 	archetype string
 	tldr      string
@@ -317,6 +320,9 @@ func (m PipelineModel) handleKey(msg tea.KeyMsg) (PipelineModel, tea.Cmd) {
 
 	case "p":
 		return m, func() tea.Msg { return PipelineOpenProgressMsg{} }
+
+	case "i":
+		return m, func() tea.Msg { return PipelineOpenInboxMsg{} }
 
 	case "r":
 		return m, func() tea.Msg { return PipelineRefreshMsg{} }

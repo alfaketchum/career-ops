@@ -39,4 +39,9 @@ bun.lock
 .claude/settings.local.json
 .claude/memory/
 career-dashboard
+career-dashboard.exe
+dashboard/career-dashboard.exe
+batch/batch-input.tsv
+batch/batch-input-deep.tsv
+batch/batch-state.tsv
 package-lock.json
