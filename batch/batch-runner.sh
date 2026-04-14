@@ -392,7 +392,26 @@ process_offer() {
       score="$score_match"
     fi
 
-    # Check min-score gate
+    # Screen mode: append priority score to priority-scores.tsv, skip min-score gate
+    if [[ "$SCREEN_MODE" == "true" ]]; then
+      local scores_file="$BATCH_DIR/priority-scores.tsv"
+      local company=""
+      company=$(sed -nE 's/.*"company":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
+      local role=""
+      role=$(sed -nE 's/.*"role":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
+      local reason=""
+      reason=$(sed -nE 's/.*"reason":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
+      # Ensure header exists
+      if [[ ! -f "$scores_file" ]]; then
+        echo -e "id\turl\tcompany\trole\tscore\treason" > "$scores_file"
+      fi
+      echo -e "${id}\t${url}\t${company}\t${role}\t${score}\t${reason}" >> "$scores_file"
+      update_state "$id" "$url" "completed" "$started_at" "$completed_at" "screen" "$score" "-" "$retries"
+      echo "    ✅ Scored: $score ($company)"
+      return
+    fi
+
+    # Deep mode: check min-score gate
     if [[ "$score" != "-" && -n "$score" ]] && (( $(echo "$MIN_SCORE > 0" | bc -l) )); then
       if (( $(echo "$score < $MIN_SCORE" | bc -l) )); then
         update_state "$id" "$url" "skipped" "$started_at" "$completed_at" "$report_num" "$score" "below-min-score" "$retries"
@@ -606,8 +625,24 @@ main() {
     done
   fi
 
-  # Merge tracker additions
-  merge_tracker
+  # Merge tracker additions (skip in screen mode — no tracker entries were written)
+  if [[ "$SCREEN_MODE" != "true" ]]; then
+    merge_tracker
+  else
+    echo ""
+    echo "=== Screen pass complete ==="
+    local scores_file="$BATCH_DIR/priority-scores.tsv"
+    if [[ -f "$scores_file" ]]; then
+      local scored_count
+      scored_count=$(($(wc -l < "$scores_file") - 1))
+      echo "Priority scores written to: $scores_file ($scored_count URLs)"
+    fi
+    echo ""
+    echo "Next step: reorder the queue by priority and run deep pass:"
+    echo "  node batch/sort-queue.mjs"
+    echo "  rm -f batch/batch-state.tsv"
+    echo "  bash batch/batch-runner.sh --parallel 3"
+  fi
 
   # Print summary
   print_summary

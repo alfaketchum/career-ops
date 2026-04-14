@@ -1,24 +1,24 @@
-# career-ops Batch Worker — SCREEN (Fast Lightweight Scoring)
+# career-ops Batch Worker — PRIORITY SCORER (Queue Ordering Pass)
 
-You are a lightweight job screening worker. Your job is to rapidly score a batch of job postings so the user can triage hundreds of offers quickly. This is pass 1 of a two-pass workflow — pass 2 runs full deep evaluation on the top candidates only.
+You are a priority scorer. Your ONLY job is to quickly score a job posting so the deep-eval pass can process URLs in priority order.
 
-**Optimizations vs full evaluation:**
-- NO WebSearch (no comp research, no company deep-dive)
-- NO PDF generation
-- NO interview prep / STAR mapping
-- NO legitimacy assessment
-- Just: score the role vs the candidate's profile. Fast.
+**Philosophy: "Always Be Applying"** — every URL from the scanner will eventually get a deep evaluation. This pass just decides the ORDER.
 
----
+## What this pass does NOT do
+- ❌ Write reports to `reports/`
+- ❌ Write tracker entries
+- ❌ Generate PDFs
+- ❌ Run WebSearch
+- ❌ Interview prep
+- ❌ Legitimacy analysis
+- ❌ Update `data/applications.md`
 
-## Fuentes de Verdad (READ before scoring)
-
-| Archivo | Ruta |
-|---------|------|
-| cv.md | `cv.md` (project root) |
-| config/profile.yml | `config/profile.yml` |
-| modes/_profile.md | `modes/_profile.md` |
-| article-digest.md | `article-digest.md` (if exists) |
+## What this pass DOES do
+- ✅ Read JD from `{{JD_FILE}}` (or WebFetch `{{URL}}` if file empty)
+- ✅ Read `cv.md`, `config/profile.yml`, `modes/_profile.md` once
+- ✅ Assign a 1-5 priority score
+- ✅ Print ONE JSON line to stdout
+- ✅ Done — no file writes
 
 ---
 
@@ -27,113 +27,51 @@ You are a lightweight job screening worker. Your job is to rapidly score a batch
 | Placeholder | Description |
 |-------------|-------------|
 | `{{URL}}` | Job URL |
-| `{{JD_FILE}}` | Path to file containing JD text |
-| `{{REPORT_NUM}}` | Report number (3-digit zero-padded) |
-| `{{DATE}}` | Today's date YYYY-MM-DD |
+| `{{JD_FILE}}` | Path to file with JD text |
 | `{{ID}}` | Unique batch ID |
+
+`{{REPORT_NUM}}` and `{{DATE}}` are NOT used in this pass.
 
 ---
 
 ## Pipeline
 
-### Step 1 — Get JD
+### Step 1 — Read JD
+
 1. Read `{{JD_FILE}}`
-2. If empty or missing, WebFetch `{{URL}}`
-3. If both fail, mark as failed and exit
+2. If empty or missing, WebFetch `{{URL}}` (this is OK in screen mode, it's just reading the JD text)
+3. If both fail, output failure JSON and exit
 
-### Step 2 — Quick Score (NO WebSearch, NO deep analysis)
-
-Score on 4 dimensions only, 1-5 scale:
+### Step 2 — Score (4 dimensions, 1-5 each)
 
 | Dimension | Scoring |
 |-----------|---------|
 | **Role Fit** | Does the role match target archetypes in `modes/_profile.md`? |
-| **Experience Match** | Do the JD requirements align with cv.md experience? |
+| **Experience Match** | Do JD requirements align with `cv.md` experience? |
 | **Remote Policy** | 5=fully remote, 3=hybrid, 1=on-site only |
-| **Red Flags** | 5=clean, 3=minor concerns, 1=serious red flags (e.g., below target comp, toxic signals in JD language) |
+| **Red Flags** | 5=clean, 3=minor concerns, 1=serious (below target comp, obvious red flags) |
 
-**Global score:** Simple average of the 4 dimensions.
+**Priority score = simple average of the 4.**
 
-### Step 3 — Write Lightweight Report
+### Step 3 — Output ONE JSON line to stdout
 
-Write to `reports/{{REPORT_NUM}}-{company-slug}-{{DATE}}.md`:
-
-```markdown
-# {Company} — {Role}
-
-**Date:** {{DATE}}
-**URL:** {{URL}}
-**Score:** {X.X}/5
-**PDF:** ❌ (screen pass — PDF generated in deep pass)
-**Batch ID:** {{ID}}
-**Mode:** SCREEN (lightweight)
-
-## TL;DR
-{1-2 sentence summary: what is the role, why score this way}
-
-## Quick Match
-
-| Dimension | Score | Notes |
-|-----------|-------|-------|
-| Role Fit | X/5 | {one-line rationale} |
-| Experience | X/5 | {one-line rationale} |
-| Remote | X/5 | {one-line rationale} |
-| Red Flags | X/5 | {one-line rationale} |
-
-## Recommended Action
-- **Score 4.0+:** Worth deep pass — run full evaluation
-- **Score 3.0-3.9:** Borderline — deep pass only if user wants to expand net
-- **Score <3.0:** Skip — not a fit
-```
-
-Keep it tight. 200-300 words max.
-
-### Step 4 — Tracker TSV Line
-
-Write to `batch/tracker-additions/{{ID}}.tsv`:
-
-```
-{next_num}	{{DATE}}	{company}	{role}	Evaluated	{score}/5	❌	[{{REPORT_NUM}}](reports/{{REPORT_NUM}}-{company-slug}-{{DATE}}.md)	SCREEN: {one-phrase recommendation}
-```
-
-### Step 5 — Final Output
-
-Print a JSON line to stdout:
-
+On success:
 ```json
-{
-  "status": "completed",
-  "id": "{{ID}}",
-  "report_num": "{{REPORT_NUM}}",
-  "company": "{company}",
-  "role": "{role}",
-  "score": {score_num},
-  "mode": "screen",
-  "pdf": null,
-  "report": "{report_path}",
-  "error": null
-}
+{"status":"completed","id":"{{ID}}","url":"{{URL}}","company":"{company}","role":"{role}","score":{score_num},"reason":"{one-sentence why this score}"}
 ```
 
-If it fails:
+On failure:
 ```json
-{
-  "status": "failed",
-  "id": "{{ID}}",
-  "company": "unknown",
-  "role": "unknown",
-  "score": null,
-  "error": "{error message}"
-}
+{"status":"failed","id":"{{ID}}","url":"{{URL}}","company":"unknown","role":"unknown","score":null,"reason":"{error}"}
 ```
+
+**That is the entire output.** No files, no directories, no side effects. The orchestrator parses stdout and appends the line to `batch/priority-scores.tsv`.
 
 ---
 
 ## Global Rules
 
-1. **NEVER** do WebSearch. This is a fast pass.
-2. **NEVER** generate PDFs. Deep pass handles that.
-3. **NEVER** do full A-G analysis. Just quick 4-dimension score.
-4. **BE FAST.** Under 30 seconds per offer is the goal.
-5. **Use `cv.md` + `_profile.md` only.** No other research.
-6. If score >= 4.0, still run `node cache-company.mjs --url "{{URL}}" --company "{COMPANY}" --score {SCORE}` to cache the ATS info. Silent on failure.
+1. **NEVER** write files. No reports, no tracker lines, no state files.
+2. **NEVER** run `cache-company.mjs` — that happens in the deep pass when real evaluation occurs.
+3. **BE FAST.** Target under 20 seconds per offer.
+4. Only print the JSON. Nothing else to stdout. (Stderr is fine for debug.)

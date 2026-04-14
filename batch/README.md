@@ -2,46 +2,54 @@
 
 Process multiple job offers in parallel via `claude -p` workers. Each worker runs the full evaluation pipeline (A-F report + PDF + tracker line) autonomously.
 
-## Two-Pass Workflow (Recommended for Spray-and-Pray)
+## Always Be Applying — Two-Pass Workflow
 
-When you have hundreds of URLs from a scan, don't deep-evaluate every single one.
-Use the two-pass approach:
+**Philosophy:** Every URL from the scanner will eventually get a full deep evaluation.
+The screen pass doesn't FILTER — it just ORDERS the queue so high-priority jobs
+are processed first. You can stop mid-batch and resume later; top priorities already
+have reports + PDFs.
 
-### Pass 1 — SCREEN (Haiku 4.5, fast + cheap)
+### Pass 1 — SCREEN (Haiku 4.5, priority scoring only)
 
-Scores every URL on 4 dimensions (role fit, experience match, remote, red flags).
-No WebSearch, no PDF, no interview prep. ~30s per offer.
+Scores every URL on 4 dimensions (role fit, experience, remote, red flags).
+**No reports, no tracker entries, no PDFs** — just priority scores.
+~20s per offer.
 
 ```bash
 bash batch/batch-runner.sh --screen --parallel 5
 ```
 
-### Select top candidates
+Output: `batch/priority-scores.tsv` with one row per URL.
 
-Pick the top N scored offers for deep evaluation:
+### Sort the queue
+
+Reorder `batch-input.tsv` by priority score (highest first):
 
 ```bash
-node batch/select-top.mjs --top 20 --min-score 3.5
-# Writes batch/batch-input-deep.tsv with the top 20 offers
+node batch/sort-queue.mjs
+# Overwrites batch-input.tsv; backs up the original as batch-input.unsorted.tsv
 ```
 
-### Pass 2 — DEEP (Sonnet 4.5 or Opus, full quality)
+### Pass 2 — DEEP (Sonnet 4.5, full quality)
 
-Full A-G evaluation, WebSearch for comp/culture, tailored PDF CV:
+Full A-G evaluation, WebSearch for comp/culture, tailored PDF CV, tracker entry.
+Processes in priority order. You can stop mid-run and resume later.
 
 ```bash
-cp batch/batch-input-deep.tsv batch/batch-input.tsv
-rm -f batch/batch-state.tsv  # reset state for new batch
+rm -f batch/batch-state.tsv  # reset state for the new ordered queue
 bash batch/batch-runner.sh --parallel 3
 
-# Or for max quality on the few you'll actually apply to:
-CLAUDE_MODEL=claude-opus-4-5 bash batch/batch-runner.sh
+# Max quality mode (Opus):
+CLAUDE_MODEL=claude-opus-4-5 bash batch/batch-runner.sh --parallel 2
 ```
 
-**Cost comparison on 150 URLs:**
-- All-Opus single pass: ~$40-60
-- Sonnet single pass: ~$15-20
-- Two-pass (Haiku screen + Opus top-20): ~$8-12 — best value
+**Cost on 150 URLs (all get evaluated — just in priority order):**
+- Screen pass (Haiku): ~$2-3
+- Deep pass all (Sonnet): ~$15-20
+- **Total: ~$17-23**
+
+vs. skipping screen (all random order, same cost but worse prioritization).
+vs. all-Opus (~$40-60 for the same deep pass).
 
 ## Quick Start
 
