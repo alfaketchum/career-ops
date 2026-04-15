@@ -20,6 +20,7 @@
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, resolve } from 'path';
+import { classifyLiveness } from './liveness-core.mjs';
 
 const AUTH_DIR = resolve('.playwright-auth');
 const TIMEOUT_MS = 25000;
@@ -121,7 +122,7 @@ async function extract(page) {
   return data;
 }
 
-// ── liveness check ──────────────────────────────────────────────
+// ── login wall detection (host-specific, complements liveness-core) ──
 
 function looksLoggedOut(host, body) {
   if (!body) return false;
@@ -135,12 +136,16 @@ function looksLoggedOut(host, body) {
   return false;
 }
 
-function looksExpired(body, finalUrl) {
-  if (finalUrl && finalUrl.includes('?error=true')) return true;
-  if (!body) return true;
-  const lower = body.toLowerCase().slice(0, 2000);
-  if (/page not found|job no longer available|no longer accepting|this job has expired/.test(lower)) return true;
-  return body.length < 250;
+// LinkedIn-specific: dead job IDs redirect to /jobs/ (the home page).
+// Detect this so we can mark as expired instead of returning the home page.
+function isLinkedInHomeRedirect(originalUrl, finalUrl) {
+  if (!originalUrl.includes('linkedin.com/jobs/view/')) return false;
+  // If we navigated to a /jobs/view/ URL but ended up at /jobs/ or /jobs/search,
+  // LinkedIn redirected because the job is gone.
+  const cleanFinal = finalUrl.split('?')[0].replace(/\/+$/, '');
+  return /linkedin\.com\/jobs\/?$/.test(cleanFinal) ||
+         cleanFinal.endsWith('/jobs/search') ||
+         cleanFinal.includes('/jobs/collections/');
 }
 
 // ── main ─────────────────────────────────────────────────────────
@@ -157,7 +162,8 @@ async function main() {
       args: ['--disable-blink-features=AutomationControlled'],
     });
     page = await context.newPage();
-    await page.goto(url, { timeout: TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+    const response = await page.goto(url, { timeout: TIMEOUT_MS, waitUntil: 'domcontentloaded' });
+    const status = response ? response.status() : 0;
 
     // Wait for either the JD content to render OR a generic body fallback.
     // Try a few likely selectors, but don't fail if none match.
@@ -183,19 +189,38 @@ async function main() {
     const data = await extract(page);
     const host = new URL(finalUrl).hostname;
 
+    // Login wall (host-specific)
     if (looksLoggedOut(host, data.body)) {
       fail('login_required', { hint: 'Run: node auth-setup.mjs to log in.' });
       return;
     }
-    if (looksExpired(data.body, finalUrl)) {
-      fail('expired', { finalUrl, length: (data.body || '').length });
+
+    // LinkedIn redirected to home page = job is dead
+    if (isLinkedInHomeRedirect(url, finalUrl)) {
+      fail('expired', { finalUrl, reason: 'LinkedIn redirected to jobs home (job removed)' });
       return;
     }
+
+    // Use the existing shared liveness classifier (DRY with check-liveness.mjs)
+    const apply = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll('a, button, [role="button"], input[type="submit"]'));
+      return els
+        .filter(el => !el.closest('nav, header, footer'))
+        .map(el => (el.innerText || el.value || el.getAttribute('aria-label') || '').trim())
+        .filter(Boolean);
+    });
+    const verdict = classifyLiveness({ status, finalUrl, bodyText: data.body, applyControls: apply });
+    if (verdict.result === 'expired') {
+      fail('expired', { finalUrl, reason: verdict.reason });
+      return;
+    }
+    // 'uncertain' is OK — caller decides. We still return the body.
 
     ok({
       title: (data.title || '').trim().slice(0, 300),
       company: (data.company || '').trim().slice(0, 200),
       body: (data.body || '').trim(),
+      liveness: verdict.result,
     });
   } catch (err) {
     fail(`fetch_error: ${err.message}`);

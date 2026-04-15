@@ -357,6 +357,22 @@ async function main() {
     }
   }
 
+  // ── Authenticated LinkedIn scan (if auth dir exists) ──
+  // Hooks into the same dedup + scan-history.tsv flow as the ATS scan.
+  if (existsSync('.playwright-auth') && !args.includes('--no-linkedin')) {
+    console.log('\n=== LinkedIn (authenticated search) ===');
+    const { spawnSync } = await import('child_process');
+    const res = spawnSync('node', ['linkedin-scan.mjs', ...(dryRun ? ['--dry-run'] : [])], {
+      stdio: 'inherit',
+      shell: false,
+    });
+    if (res.status !== 0) {
+      console.log('  (LinkedIn scan exited non-zero; continuing)');
+    }
+  } else if (!existsSync('.playwright-auth')) {
+    console.log('\n(Skipping LinkedIn scan — no auth. Run: node auth-setup.mjs to enable.)');
+  }
+
   console.log(`\n→ Run /career-ops pipeline to evaluate new offers.`);
   console.log('→ Share results and get help: https://discord.gg/8pRpHETxa4');
 }

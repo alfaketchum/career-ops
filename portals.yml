@@ -87,82 +87,13 @@ title_filter:
 # Top-down approach: search job aggregators that index all public companies.
 # Each query is a WebSearch. Mix of role types × job boards for maximum coverage.
 
+#
+# Sites with login walls (LinkedIn, Glassdoor, Indeed) are NOT scanned via
+# Google site: queries — those return stale URLs from Google's cache.
+# LinkedIn is handled by linkedin-scan.mjs (Playwright + auth).
+# Glassdoor is intentionally skipped for now; will get its own scanner.
+#
 search_queries:
-
-  # ===== LINKEDIN =====
-  - name: LinkedIn — Financial Analyst Remote
-    query: 'site:linkedin.com/jobs "Financial Analyst" OR "Finance Analyst" remote'
-    enabled: true
-
-  - name: LinkedIn — Credit Risk Analyst Remote
-    query: 'site:linkedin.com/jobs "Credit Analyst" OR "Risk Analyst" remote'
-    enabled: true
-
-  - name: LinkedIn — Business Analyst Remote
-    query: 'site:linkedin.com/jobs "Business Analyst" OR "Strategy Analyst" remote'
-    enabled: true
-
-  - name: LinkedIn — FP&A Remote
-    query: 'site:linkedin.com/jobs "FP&A" OR "Financial Planning" remote'
-    enabled: true
-
-  - name: LinkedIn — BD Partnerships Remote
-    query: 'site:linkedin.com/jobs "Business Development" OR "Partnerships Manager" remote'
-    enabled: true
-
-  - name: LinkedIn — BizOps Remote
-    query: 'site:linkedin.com/jobs "Business Operations" OR "BizOps" OR "Operations Analyst" remote'
-    enabled: true
-
-  - name: LinkedIn — Program Manager Remote
-    query: 'site:linkedin.com/jobs "Program Manager" OR "Project Manager" remote finance OR fintech'
-    enabled: true
-
-  - name: LinkedIn — Data Analyst Remote
-    query: 'site:linkedin.com/jobs "Data Analyst" OR "Reporting Analyst" remote'
-    enabled: true
-
-  - name: LinkedIn — Compliance Analyst Remote
-    query: 'site:linkedin.com/jobs "Compliance Analyst" OR "Compliance Manager" remote'
-    enabled: true
-
-  - name: LinkedIn — Influencer Marketing Remote
-    query: 'site:linkedin.com/jobs "Influencer Marketing" OR "Creator Partnerships" remote'
-    enabled: true
-
-  # ===== INDEED =====
-  - name: Indeed — Financial Analyst Remote
-    query: 'site:indeed.com "Financial Analyst" OR "Credit Analyst" remote'
-    enabled: true
-
-  - name: Indeed — Business Analyst Remote
-    query: 'site:indeed.com "Business Analyst" OR "Strategy Analyst" remote'
-    enabled: true
-
-  - name: Indeed — FP&A Remote
-    query: 'site:indeed.com "FP&A" OR "Financial Planning" OR "Budget Analyst" remote'
-    enabled: true
-
-  - name: Indeed — BD Partnerships Remote
-    query: 'site:indeed.com "Business Development" OR "Partnerships" remote'
-    enabled: true
-
-  - name: Indeed — Operations Analyst Remote
-    query: 'site:indeed.com "Operations Analyst" OR "Business Operations" remote'
-    enabled: true
-
-  # ===== GLASSDOOR =====
-  - name: Glassdoor — Financial Analyst Remote
-    query: 'site:glassdoor.com/job "Financial Analyst" OR "Credit Analyst" remote'
-    enabled: true
-
-  - name: Glassdoor — Business Analyst Remote
-    query: 'site:glassdoor.com/job "Business Analyst" OR "Strategy Analyst" remote'
-    enabled: true
-
-  - name: Glassdoor — BD Partnerships Remote
-    query: 'site:glassdoor.com/job "Business Development" OR "Partnerships" remote'
-    enabled: true
 
   # ===== BUILTIN =====
   - name: BuiltIn — Financial Analyst Remote
@@ -246,3 +177,20 @@ tracked_companies: []
   # - name: "S&P Global"
   #   careers_url: "https://careers.spglobal.com"
   #   enabled: true
+
+# -- LinkedIn (authenticated scanner) --
+# Used by linkedin-scan.mjs. Run `node auth-setup.mjs` once first to log in.
+# Each search hits LinkedIn's own job search (not Google cache) → live URLs only.
+# remote: true → adds f_WT=2 filter (Remote only).
+
+linkedin:
+  searches:
+    - { name: "LinkedIn — Financial Analyst (Remote)",  q: "Financial Analyst",                  remote: true }
+    - { name: "LinkedIn — Credit Analyst (Remote)",     q: "Credit Analyst",                     remote: true }
+    - { name: "LinkedIn — FP&A (Remote)",               q: "FP&A",                               remote: true }
+    - { name: "LinkedIn — Business Analyst (Remote)",   q: "Business Analyst",                   remote: true }
+    - { name: "LinkedIn — Strategy Analyst (Remote)",   q: "Strategy Analyst",                   remote: true }
+    - { name: "LinkedIn — BizOps (Remote)",             q: "Business Operations",                remote: true }
+    - { name: "LinkedIn — BD/Partnerships (Remote)",    q: "Business Development Partnerships",  remote: true }
+    - { name: "LinkedIn — Influencer Marketing (Remote)", q: "Influencer Marketing",             remote: true }
+    - { name: "LinkedIn — Compliance Analyst (Remote)", q: "Compliance Analyst",                 remote: true }
