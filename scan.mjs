@@ -357,20 +357,24 @@ async function main() {
     }
   }
 
-  // ── Authenticated LinkedIn scan (if auth dir exists) ──
-  // Hooks into the same dedup + scan-history.tsv flow as the ATS scan.
-  if (existsSync('.playwright-auth') && !args.includes('--no-linkedin')) {
-    console.log('\n=== LinkedIn (authenticated search) ===');
-    const { spawnSync } = await import('child_process');
-    const res = spawnSync('node', ['linkedin-scan.mjs', ...(dryRun ? ['--dry-run'] : [])], {
-      stdio: 'inherit',
-      shell: false,
-    });
-    if (res.status !== 0) {
-      console.log('  (LinkedIn scan exited non-zero; continuing)');
+  // ── Optional: authenticated LinkedIn scan ──
+  // Disabled by default. Opt-in with --linkedin-auth.
+  // LinkedIn aggressively detects authenticated automation, so this carries
+  // an account-ban risk. The default WebSearch path is safer.
+  if (args.includes('--linkedin-auth')) {
+    if (!existsSync('.playwright-auth')) {
+      console.log('\n(--linkedin-auth requested but no auth dir — run: node auth-setup.mjs first)');
+    } else {
+      console.log('\n=== LinkedIn (authenticated direct search) ===');
+      const { spawnSync } = await import('child_process');
+      const res = spawnSync('node', ['linkedin-scan.mjs', ...(dryRun ? ['--dry-run'] : [])], {
+        stdio: 'inherit',
+        shell: false,
+      });
+      if (res.status !== 0) {
+        console.log('  (LinkedIn scan exited non-zero; continuing)');
+      }
     }
-  } else if (!existsSync('.playwright-auth')) {
-    console.log('\n(Skipping LinkedIn scan — no auth. Run: node auth-setup.mjs to enable.)');
   }
 
   console.log(`\n→ Run /career-ops pipeline to evaluate new offers.`);

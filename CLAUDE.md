@@ -63,6 +63,9 @@ AI-powered job search automation built on Claude Code: pipeline tracking, offer 
 | `data/follow-ups.md` | Follow-up history tracker |
 | `scan.mjs` | Zero-token portal scanner — hits Greenhouse/Ashby/Lever APIs directly, zero LLM cost |
 | `cache-company.mjs` | Auto-cache companies to portals.yml after high-score evaluations |
+| `linkedin-scan.mjs` | OPT-IN authenticated LinkedIn job search (`node scan.mjs --linkedin-auth`). Requires `node auth-setup.mjs` first. Account-ban risk — use sparingly. |
+| `auth-setup.mjs` | One-time browser login capture for LinkedIn/Glassdoor (only needed if using --linkedin-auth) |
+| `fetch-jd.mjs` | Auth-aware JD fetcher used by deep pass when WebFetch fails. Uses `liveness-core.mjs` for staleness classification. |
 | `pass-history.mjs` | URL-keyed persistent state tracker (light pass + deep pass dedup) |
 | `web/server.mjs` | Browser dashboard server (read-only). Run: `npm run web` → http://localhost:3000 |
 | `data/pass-history.tsv` | Single source of truth for what URLs have been light/deep passed |

@@ -3,24 +3,34 @@
 /**
  * linkedin-scan.mjs — Authenticated LinkedIn job search scanner.
  *
+ * ⚠️ OPT-IN ONLY. LinkedIn aggressively detects automated access from
+ * authenticated sessions. Heavy use can trigger account restrictions or
+ * bans. The DEFAULT scan mode (`node scan.mjs`) uses WebSearch + Playwright
+ * liveness verify, which is safer.
+ *
+ * Use this only when:
+ * - You need fresher LinkedIn URLs than Google's cache provides
+ * - You want roles that don't appear in Google site: queries
+ * - You accept the account-ban risk
+ *
+ * Mitigation: keep --max small (default 25), don't run more than once a day,
+ * use a dedicated/secondary LinkedIn account if possible.
+ *
  * Uses Playwright with persistent auth (.playwright-auth/) to query
- * LinkedIn's own search API. Returns LIVE URLs only — no Google cache,
- * no stale links.
+ * LinkedIn's own search. Returns LIVE URLs only.
  *
  * Reads search keywords from portals.yml -> linkedin.searches.
- * Falls back to default queries if not configured.
  *
  * Output: appends new URLs to data/pipeline.md AND data/scan-history.tsv,
  * deduplicating against both.
  *
  * Usage:
- *   node linkedin-scan.mjs
+ *   node auth-setup.mjs                        # one-time: log in
+ *   node linkedin-scan.mjs                     # run scan
  *   node linkedin-scan.mjs --dry-run
- *   node linkedin-scan.mjs --max 30        # max results per query (default 25)
- *   node linkedin-scan.mjs --query "credit analyst"   # one-off query
- *
- * Requirements:
- *   Run `node auth-setup.mjs` first to log in to LinkedIn.
+ *   node linkedin-scan.mjs --max 30            # max results per query
+ *   node linkedin-scan.mjs --query "credit analyst"   # one-off
+ *   node scan.mjs --linkedin-auth              # equivalent (called from scan)
  */
 
 import { chromium } from 'playwright';

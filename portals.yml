@@ -88,12 +88,73 @@ title_filter:
 # Each query is a WebSearch. Mix of role types × job boards for maximum coverage.
 
 #
-# Sites with login walls (LinkedIn, Glassdoor, Indeed) are NOT scanned via
-# Google site: queries — those return stale URLs from Google's cache.
-# LinkedIn is handled by linkedin-scan.mjs (Playwright + auth).
-# Glassdoor is intentionally skipped for now; will get its own scanner.
+# DEFAULT MODE: WebSearch (site: queries) for everything, including LinkedIn
+# and Glassdoor. The /career-ops scan command runs Playwright liveness checks
+# (modes/scan.md step 7.5) before adding to pipeline, so stale URLs are
+# filtered out automatically. No auth needed. Low ban risk.
+#
+# OPTIONAL MODE: For higher-quality LinkedIn results, run a one-time
+# `node auth-setup.mjs`, then use `node linkedin-scan.mjs` (or
+# `node scan.mjs --linkedin-auth`). Uses authenticated browser to query
+# LinkedIn's own search → 100% live URLs. Comes with account-ban risk,
+# so disabled by default.
 #
 search_queries:
+
+  # ===== LINKEDIN (WebSearch — default safe mode) =====
+  - name: LinkedIn — Financial Analyst Remote
+    query: 'site:linkedin.com/jobs "Financial Analyst" OR "Finance Analyst" remote'
+    enabled: true
+
+  - name: LinkedIn — Credit Risk Analyst Remote
+    query: 'site:linkedin.com/jobs "Credit Analyst" OR "Risk Analyst" remote'
+    enabled: true
+
+  - name: LinkedIn — Business Analyst Remote
+    query: 'site:linkedin.com/jobs "Business Analyst" OR "Strategy Analyst" remote'
+    enabled: true
+
+  - name: LinkedIn — FP&A Remote
+    query: 'site:linkedin.com/jobs "FP&A" OR "Financial Planning" remote'
+    enabled: true
+
+  - name: LinkedIn — BD Partnerships Remote
+    query: 'site:linkedin.com/jobs "Business Development" OR "Partnerships Manager" remote'
+    enabled: true
+
+  - name: LinkedIn — BizOps Remote
+    query: 'site:linkedin.com/jobs "Business Operations" OR "BizOps" OR "Operations Analyst" remote'
+    enabled: true
+
+  - name: LinkedIn — Influencer Marketing Remote
+    query: 'site:linkedin.com/jobs "Influencer Marketing" OR "Creator Partnerships" remote'
+    enabled: true
+
+  # ===== GLASSDOOR (WebSearch) =====
+  - name: Glassdoor — Financial Analyst Remote
+    query: 'site:glassdoor.com/job "Financial Analyst" OR "Credit Analyst" remote'
+    enabled: true
+
+  - name: Glassdoor — Business Analyst Remote
+    query: 'site:glassdoor.com/job "Business Analyst" OR "Strategy Analyst" remote'
+    enabled: true
+
+  - name: Glassdoor — BD Partnerships Remote
+    query: 'site:glassdoor.com/job "Business Development" OR "Partnerships" remote'
+    enabled: true
+
+  # ===== INDEED (WebSearch) =====
+  - name: Indeed — Financial Analyst Remote
+    query: 'site:indeed.com "Financial Analyst" OR "Credit Analyst" remote'
+    enabled: true
+
+  - name: Indeed — Business Analyst Remote
+    query: 'site:indeed.com "Business Analyst" OR "Strategy Analyst" remote'
+    enabled: true
+
+  - name: Indeed — FP&A Remote
+    query: 'site:indeed.com "FP&A" OR "Financial Planning" OR "Budget Analyst" remote'
+    enabled: true
 
   # ===== BUILTIN =====
   - name: BuiltIn — Financial Analyst Remote

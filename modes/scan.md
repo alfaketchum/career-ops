@@ -112,23 +112,33 @@ Los niveles son aditivos — se ejecutan todos, los resultados se mezclan y dedu
    - `applications.md` → empresa + rol normalizado ya evaluado
    - `pipeline.md` → URL exacta ya en pendientes o procesadas
 
-7.5. **Verificar liveness de resultados de WebSearch (Nivel 3)** — ANTES de añadir a pipeline:
+7.5. **Verificar liveness de resultados de WebSearch (Nivel 3)** — OBLIGATORIO ANTES de añadir a pipeline:
 
-   Los resultados de WebSearch pueden estar desactualizados (Google cachea resultados durante semanas o meses). Para evitar evaluar ofertas expiradas, verificar con Playwright cada URL nueva que provenga del Nivel 3. Los Niveles 1 y 2 son inherentemente en tiempo real y no requieren esta verificación.
+   ⚠️ **ESTE PASO NO ES OPCIONAL.** Los resultados de WebSearch pueden estar desactualizados (Google cachea resultados durante días o semanas, especialmente para sitios login-walled como LinkedIn que redirigen URLs muertas a su home page en lugar de devolver 404). Si saltas este paso, pipeline.md se llenará de URLs muertas que harán fallar el deep-pass.
 
-   Para cada URL nueva de Nivel 3 (secuencial — NUNCA Playwright en paralelo):
-   a. `browser_navigate` a la URL
-   b. `browser_snapshot` para leer el contenido
-   c. Clasificar:
-      - **Activa**: título del puesto visible + descripción del rol + control visible de Apply/Submit/Solicitar dentro del contenido principal. No contar texto genérico de header/navbar/footer.
-      - **Expirada** (cualquiera de estas señales):
-        - URL final contiene `?error=true` (Greenhouse redirige así cuando la oferta está cerrada)
-        - Página contiene: "job no longer available" / "no longer open" / "position has been filled" / "this job has expired" / "page not found"
-        - Solo navbar y footer visibles, sin contenido JD (contenido < ~300 chars)
-   d. Si expirada: registrar en `scan-history.tsv` con status `skipped_expired` y descartar
-   e. Si activa: continuar al paso 8
+   Los Niveles 1 y 2 son inherentemente en tiempo real y no requieren esta verificación.
 
-   **No interrumpir el scan entero si una URL falla.** Si `browser_navigate` da error (timeout, 403, etc.), marcar como `skipped_expired` y continuar con la siguiente.
+   **Para cada URL nueva de Nivel 3 — usar el script existente:**
+   ```bash
+   node check-liveness.mjs <url>
+   ```
+   El script usa Playwright + `liveness-core.mjs` (la lógica de clasificación compartida con `fetch-jd.mjs`). Sale con código 0 si activa, 1 si expirada/incierta. **NUNCA Playwright en paralelo** — secuencial.
+
+   **Detalles de la clasificación** (implementados en `liveness-core.mjs`):
+   - **Activa**: título del puesto visible + descripción + control visible de Apply/Submit/Solicitar
+   - **Expirada** (cualquiera):
+     - HTTP 404 / 410
+     - URL final contiene `?error=true` (Greenhouse redirige así)
+     - LinkedIn redirige a `/jobs/` o `/jobs/search` (job removido)
+     - Página contiene patrones de expiración (ver `liveness-core.mjs` HARD_EXPIRED_PATTERNS)
+     - Contenido < 300 chars (solo navbar/footer)
+
+   **Acción:**
+   - Si `expired`: registrar en `scan-history.tsv` con status `skipped_expired` y descartar
+   - Si `uncertain`: añadir al pipeline pero con flag `[VERIFY]` en notes
+   - Si `active`: continuar al paso 8
+
+   **No interrumpir el scan entero si una URL falla.** Si Playwright da error, marcar como `skipped_expired` y continuar.
 
 8. **Para cada oferta nueva verificada que pase filtros**:
    a. Añadir a `pipeline.md` sección "Pendientes": `- [ ] {url} | {company} | {title}`
