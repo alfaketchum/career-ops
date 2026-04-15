@@ -62,7 +62,10 @@ function bar(value, max, cls) {
 // ── Overview ───────────────────────────────────────────────────
 
 renderers.overview = async function () {
-  const ov = await fetchJSON('/api/overview');
+  const [ov, scanner] = await Promise.all([
+    fetchJSON('/api/overview'),
+    fetchJSON('/api/scanner-status'),
+  ]);
   const max = ov.scan.totalSeen || 1;
 
   const funnel = [
@@ -135,11 +138,60 @@ renderers.overview = async function () {
     .map(([k, v]) => `<span class="status-tag ${k}">${k}: ${v}</span>`)
     .join(' ');
 
+  // ── Scanner Modes card (auth status + button) ──
+  const authBadge = scanner.authEnabled
+    ? `<span class="badge good">✓ enabled</span>`
+    : `<span class="badge muted">not configured</span>`;
+  const authRunningBadge = scanner.authSetupRunning
+    ? `<span class="badge warn">browser open — log in then close</span>`
+    : '';
+  const authButton = scanner.authEnabled
+    ? `<button class="btn btn-secondary" id="auth-btn" ${scanner.authSetupRunning ? 'disabled' : ''}>Re-authenticate</button>`
+    : `<button class="btn btn-primary" id="auth-btn" ${scanner.authSetupRunning ? 'disabled' : ''}>Set up LinkedIn auth</button>`;
+
+  const scannerModesHTML = `
+    <div class="section">
+      <h2>Scanner Modes</h2>
+      <div class="stat-list">
+        <div class="stat-row">
+          <span class="key">Default mode (WebSearch + verify)</span>
+          <span class="val good">always on</span>
+        </div>
+        <div class="stat-row">
+          <span class="key">Authenticated LinkedIn (opt-in)</span>
+          <span class="val">${authBadge}</span>
+        </div>
+        <div class="stat-row">
+          <span class="key">LinkedIn URLs added (auth scanner)</span>
+          <span class="val">${scanner.linkedInUrlsAdded}</span>
+        </div>
+        ${scanner.lastLinkedInScan ? `
+        <div class="stat-row">
+          <span class="key">Last LinkedIn auth scan</span>
+          <span class="val">${scanner.lastLinkedInScan}</span>
+        </div>` : ''}
+      </div>
+      <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+        ${authButton}
+        ${authRunningBadge}
+      </div>
+      <div style="margin-top: 8px; color: var(--subtext); font-size: 11px;">
+        ${scanner.authEnabled
+          ? 'Run: <code>node scan.mjs --linkedin-auth</code> to fetch live LinkedIn URLs.'
+          : 'Click to open a browser and log in to LinkedIn. Required for the opt-in authenticated scanner.'}
+        <br>
+        ⚠️ LinkedIn detects authenticated automation — use sparingly to avoid account restrictions.
+      </div>
+    </div>
+  `;
+
   const html = `
     <div class="section">
       <h2>Pipeline Funnel</h2>
       <div class="funnel">${funnelHTML}</div>
     </div>
+
+    ${scannerModesHTML}
 
     <div class="cards">
       <div class="section">
@@ -169,6 +221,45 @@ renderers.overview = async function () {
     </div>
   `;
   $('#content').innerHTML = html;
+
+  // Wire the auth-setup button
+  const btn = $('#auth-btn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Opening browser…';
+      try {
+        const r = await fetch('/api/auth-setup', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) {
+          alert(data.error || 'Failed to start auth setup');
+          btn.disabled = false;
+          btn.textContent = scanner.authEnabled ? 'Re-authenticate' : 'Set up LinkedIn auth';
+          return;
+        }
+        // Re-render so the "browser open" badge appears + start aggressive polling
+        await renderers.overview();
+        // Poll every 2s for up to 5 minutes — when authSetupRunning flips to false
+        // and authEnabled flips to true, we know it succeeded
+        let polls = 0;
+        const maxPolls = 150; // 5 min
+        const interval = setInterval(async () => {
+          polls++;
+          if (polls > maxPolls) { clearInterval(interval); return; }
+          try {
+            const s = await fetchJSON('/api/scanner-status');
+            if (!s.authSetupRunning) {
+              clearInterval(interval);
+              await renderers.overview();
+            }
+          } catch {}
+        }, 2000);
+      } catch (err) {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+      }
+    });
+  }
 };
 
 // ── Inbox ──────────────────────────────────────────────────────

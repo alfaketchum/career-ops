@@ -340,3 +340,43 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   margin-top: 8px;
 }
+
+/* ── Buttons (action triggers) ──────────────────────────────────── */
+
+.btn {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--mauve); color: var(--crust); }
+.btn-primary:hover:not(:disabled) { background: var(--pink); }
+.btn-secondary { background: var(--surface0); color: var(--text); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface1); }
+
+/* ── Badges (status pills) ──────────────────────────────────────── */
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.good { background: rgba(166,227,161,0.2); color: var(--green); }
+.badge.warn { background: rgba(249,226,175,0.2); color: var(--yellow); }
+.badge.muted { background: var(--surface0); color: var(--muted); }
+
+code {
+  background: var(--surface0);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--peach);
+  font-size: 11px;
+}

@@ -16,6 +16,7 @@ import { createServer } from 'http';
 import { readFileSync, existsSync, statSync } from 'fs';
 import { join, dirname, extname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import {
   parseApplications,
   parsePipelineInbox,
@@ -27,6 +28,7 @@ import {
   computeOverview,
   readProfileFile,
   readReport,
+  getScannerStatus,
   PROFILE_FILES,
 } from './parsers.mjs';
 
@@ -86,6 +88,14 @@ function sendJSON(res, data, status = 200) {
 function sendText(res, text, status = 200, contentType = 'text/plain; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': contentType, 'Cache-Control': 'no-store' });
   res.end(text);
+}
+
+// ── auth-setup process tracking ─────────────────────────────────
+
+let authSetupProc = null;
+
+function isAuthSetupRunning() {
+  return authSetupProc != null && authSetupProc.exitCode == null;
 }
 
 // ── Server ──────────────────────────────────────────────────────
@@ -151,6 +161,32 @@ const server = createServer((req, res) => {
 
     if (path === '/api/health') {
       return sendJSON(res, { ok: true, careerOpsPath });
+    }
+
+    if (path === '/api/scanner-status') {
+      const status = getScannerStatus(careerOpsPath);
+      status.authSetupRunning = isAuthSetupRunning();
+      return sendJSON(res, status);
+    }
+
+    if (path === '/api/auth-setup' && req.method === 'POST') {
+      if (isAuthSetupRunning()) {
+        return sendJSON(res, { ok: false, error: 'Auth setup already running. Close the browser window first.' }, 409);
+      }
+      try {
+        authSetupProc = spawn('node', ['auth-setup.mjs'], {
+          cwd: careerOpsPath,
+          stdio: 'ignore',
+          detached: false,
+        });
+        authSetupProc.on('exit', () => {
+          // keep the proc reference for one more poll cycle, then clear
+          setTimeout(() => { authSetupProc = null; }, 2000);
+        });
+        return sendJSON(res, { ok: true, pid: authSetupProc.pid, message: 'Browser window opening — log in to LinkedIn, then close the window.' });
+      } catch (err) {
+        return sendJSON(res, { ok: false, error: err.message }, 500);
+      }
     }
 
     // ── Static ──

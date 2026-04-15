@@ -452,6 +452,42 @@ export function readProfileFile(careerOpsPath, key) {
   return { path: rel, content: readFileSync(p, 'utf8') };
 }
 
+// ── scanner status (auth + LinkedIn coverage) ──
+
+export function getScannerStatus(careerOpsPath) {
+  const authDir = join(careerOpsPath, '.playwright-auth');
+  const authEnabled = existsSync(authDir);
+
+  // Count LinkedIn URLs added by the authenticated scanner
+  // (linkedin-scan.mjs always tags portal as "LinkedIn — ...")
+  const stats = {
+    authEnabled,
+    linkedInUrlsAdded: 0,
+    lastLinkedInScan: '',
+    webSearchUrlsAdded: 0,
+  };
+
+  const scanPath = join(careerOpsPath, 'data', 'scan-history.tsv');
+  if (!existsSync(scanPath)) return stats;
+  const content = readFileSync(scanPath, 'utf8');
+  const lines = content.split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const f = lines[i].split('\t');
+    if (f.length < 6) continue;
+    const [, date, portal, , , status] = f;
+    if (status !== 'added') continue;
+    // linkedin-scan.mjs portals always include " (Remote)" suffix and use em-dash;
+    // WebSearch portals from /career-ops scan use "site:linkedin.com" or just "LinkedIn — ... Remote" (no parens)
+    if (portal && /^LinkedIn — .* \(Remote\)/.test(portal)) {
+      stats.linkedInUrlsAdded++;
+      if (date > stats.lastLinkedInScan) stats.lastLinkedInScan = date;
+    } else if (portal && portal.startsWith('site:')) {
+      stats.webSearchUrlsAdded++;
+    }
+  }
+  return stats;
+}
+
 // Simple report content read for the in-app viewer
 export function readReport(careerOpsPath, reportPath) {
   // reportPath comes in as e.g. "reports/045-acme-2026-04-14.md"
