@@ -98,6 +98,14 @@ function isAuthSetupRunning() {
   return authSetupProc != null && authSetupProc.exitCode == null;
 }
 
+// ── scan-verify (batch-liveness) process tracking ───────────────
+
+let scanVerifyProc = null;
+
+function isScanVerifyRunning() {
+  return scanVerifyProc != null && scanVerifyProc.exitCode == null;
+}
+
 // ── Server ──────────────────────────────────────────────────────
 
 const server = createServer((req, res) => {
@@ -167,6 +175,38 @@ const server = createServer((req, res) => {
       const status = getScannerStatus(careerOpsPath);
       status.authSetupRunning = isAuthSetupRunning();
       return sendJSON(res, status);
+    }
+
+    if (path === '/api/scan-progress') {
+      const progressPath = join(careerOpsPath, 'data', 'scan-progress.json');
+      let data = { status: 'idle', running: isScanVerifyRunning() };
+      if (existsSync(progressPath)) {
+        try { data = { ...JSON.parse(readFileSync(progressPath, 'utf8')), running: isScanVerifyRunning() }; } catch {}
+      }
+      return sendJSON(res, data);
+    }
+
+    if (path === '/api/scan-verify' && req.method === 'POST') {
+      if (isScanVerifyRunning()) {
+        return sendJSON(res, { ok: false, error: 'A liveness scan is already running.' }, 409);
+      }
+      const candidatesPath = join(careerOpsPath, 'batch', 'scan-candidates.json');
+      if (!existsSync(candidatesPath)) {
+        return sendJSON(res, { ok: false, error: 'No batch/scan-candidates.json found. Generate one first by running a scan.' }, 400);
+      }
+      try {
+        scanVerifyProc = spawn('node', ['batch-liveness.mjs', '--input', 'batch/scan-candidates.json'], {
+          cwd: careerOpsPath,
+          stdio: 'ignore',
+          detached: false,
+        });
+        scanVerifyProc.on('exit', () => {
+          setTimeout(() => { scanVerifyProc = null; }, 2000);
+        });
+        return sendJSON(res, { ok: true, pid: scanVerifyProc.pid });
+      } catch (err) {
+        return sendJSON(res, { ok: false, error: err.message }, 500);
+      }
     }
 
     if (path === '/api/auth-setup' && req.method === 'POST') {

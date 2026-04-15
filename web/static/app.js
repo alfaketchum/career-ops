@@ -62,9 +62,10 @@ function bar(value, max, cls) {
 // ── Overview ───────────────────────────────────────────────────
 
 renderers.overview = async function () {
-  const [ov, scanner] = await Promise.all([
+  const [ov, scanner, scanProg] = await Promise.all([
     fetchJSON('/api/overview'),
     fetchJSON('/api/scanner-status'),
+    fetchJSON('/api/scan-progress'),
   ]);
   const max = ov.scan.totalSeen || 1;
 
@@ -185,6 +186,74 @@ renderers.overview = async function () {
     </div>
   `;
 
+  // ── Liveness Verification card ──
+  const livenessCardHTML = (() => {
+    const isRunning = !!scanProg.running;
+    const hasState = scanProg.status && scanProg.status !== 'idle';
+    const checked = scanProg.checked || 0;
+    const total = scanProg.total || 0;
+    const pct = total > 0 ? (checked / total) * 100 : 0;
+    const activeCount = scanProg.active || 0;
+    const expiredCount = scanProg.expired || 0;
+    const recentActive = scanProg.recentActive || [];
+    const recentExpired = scanProg.recentExpired || [];
+
+    let statusLine = 'No verification has been run.';
+    let progressBar = '';
+    let recents = '';
+    let buttonLabel = 'Verify URLs in pipeline';
+    let buttonDisabled = '';
+
+    if (hasState) {
+      if (scanProg.status === 'running' || isRunning) {
+        statusLine = scanProg.current
+          ? `Verifying: <strong>${escapeHTML(scanProg.current)}</strong>`
+          : 'Verifying…';
+        buttonLabel = 'Verifying… (stay on this page)';
+        buttonDisabled = 'disabled';
+      } else if (scanProg.status === 'completed') {
+        statusLine = `Last run: ${scanProg.finishedAt ? scanProg.finishedAt.split('T')[0] : 'recent'} — ${activeCount} active, ${expiredCount} expired (${total} total)`;
+        buttonLabel = 'Run verification again';
+      }
+      progressBar = `
+        <div style="margin-top: 10px;">
+          <div class="bar"><div class="bar-fill ${activeCount > 0 ? 'applied' : 'light'}" style="width: ${pct}%"></div></div>
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--subtext); margin-top: 4px;">
+            <span>${checked} / ${total} checked</span>
+            <span>✓ ${activeCount} active &nbsp; ✗ ${expiredCount} expired</span>
+          </div>
+        </div>`;
+      if (recentActive.length || recentExpired.length) {
+        recents = `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; font-size: 11px;">
+            <div>
+              <div style="color: var(--green); font-weight: 600; margin-bottom: 4px;">Recent active</div>
+              ${recentActive.slice(0, 5).map(r => `<div style="color: var(--text);">${escapeHTML(r)}</div>`).join('') || '<div style="color: var(--muted);">none yet</div>'}
+            </div>
+            <div>
+              <div style="color: var(--peach); font-weight: 600; margin-bottom: 4px;">Recent expired</div>
+              ${recentExpired.slice(0, 5).map(r => `<div style="color: var(--muted);">${escapeHTML(r)}</div>`).join('') || '<div style="color: var(--muted);">none yet</div>'}
+            </div>
+          </div>`;
+      }
+    }
+
+    return `
+      <div class="section">
+        <h2>URL Liveness Verification</h2>
+        <div style="color: var(--subtext); font-size: 12px;">${statusLine}</div>
+        ${progressBar}
+        ${recents}
+        <div style="margin-top: 12px;">
+          <button class="btn btn-primary" id="verify-btn" ${buttonDisabled}>${buttonLabel}</button>
+        </div>
+        <div style="margin-top: 8px; color: var(--subtext); font-size: 11px;">
+          Reads <code>batch/scan-candidates.json</code>, runs Playwright liveness on each URL, writes active to <code>data/pipeline.md</code> and all results to <code>data/scan-history.tsv</code>.
+        </div>
+      </div>
+    `;
+  })();
+
   const html = `
     <div class="section">
       <h2>Pipeline Funnel</h2>
@@ -192,6 +261,8 @@ renderers.overview = async function () {
     </div>
 
     ${scannerModesHTML}
+
+    ${livenessCardHTML}
 
     <div class="cards">
       <div class="section">
@@ -221,6 +292,38 @@ renderers.overview = async function () {
     </div>
   `;
   $('#content').innerHTML = html;
+
+  // Wire the verify button
+  const verifyBtn = $('#verify-btn');
+  if (verifyBtn) {
+    verifyBtn.addEventListener('click', async () => {
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Starting…';
+      try {
+        const r = await fetch('/api/scan-verify', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) {
+          alert(data.error || 'Failed to start verification');
+          verifyBtn.disabled = false;
+          return;
+        }
+        await renderers.overview();
+        // Poll every 2s while running, re-render to update progress bar
+        const interval = setInterval(async () => {
+          try {
+            const s = await fetchJSON('/api/scan-progress');
+            if (!s.running && s.status === 'completed') {
+              clearInterval(interval);
+            }
+            await renderers.overview();
+          } catch {}
+        }, 2000);
+      } catch (err) {
+        alert('Error: ' + err.message);
+        verifyBtn.disabled = false;
+      }
+    });
+  }
 
   // Wire the auth-setup button
   const btn = $('#auth-btn');
