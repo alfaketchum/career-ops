@@ -94,6 +94,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.profile = screens.NewProfileModel(m.theme, m.careerOpsPath, m.overview.Width(), m.overview.Height())
 		m.state = viewProfile
 		return m, nil
+	case screens.OverviewOpenTrackerMsg:
+		m.state = viewPipeline
+		return m, nil
 	case screens.OverviewOpenURLMsg:
 		url := msg.URL
 		return m, openURLCmd(url)
@@ -121,6 +124,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, openURLCmd(msg.URL)
 
 	case screens.PipelineClosedMsg:
+		// From pipeline view, go back to overview instead of quitting
+		if m.state == viewPipeline {
+			m.reloadOverview()
+			m.state = viewOverview
+			return m, nil
+		}
 		return m, tea.Quit
 
 	case screens.PipelineLoadReportMsg:

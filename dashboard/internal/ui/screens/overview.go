@@ -23,6 +23,9 @@ type OverviewOpenInboxMsg struct{}
 // OverviewOpenProfileMsg jumps to the profile viewer.
 type OverviewOpenProfileMsg struct{}
 
+// OverviewOpenTrackerMsg jumps to the applications tracker.
+type OverviewOpenTrackerMsg struct{}
+
 // OverviewModel renders a top-level "state of your job search" dashboard.
 type OverviewModel struct {
 	overview     model.Overview
@@ -55,6 +58,8 @@ func (m OverviewModel) Update(msg tea.Msg) (OverviewModel, tea.Cmd) {
 			return m, func() tea.Msg { return OverviewClosedMsg{} }
 		case "i":
 			return m, func() tea.Msg { return OverviewOpenInboxMsg{} }
+		case "t":
+			return m, func() tea.Msg { return OverviewOpenTrackerMsg{} }
 		case "P":
 			return m, func() tea.Msg { return OverviewOpenProfileMsg{} }
 		case "down", "j":
@@ -243,7 +248,7 @@ func (m OverviewModel) View() string {
 	}
 
 	// Footer
-	b.WriteString(dim.Render("↑/↓ select  o open URL  i Inbox  P Profile  q Quit"))
+	b.WriteString(dim.Render("↑/↓ select  o open URL  t Tracker  i Inbox  P Profile  q Quit"))
 	return b.String()
 }
 
