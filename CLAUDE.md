@@ -63,6 +63,8 @@ AI-powered job search automation built on Claude Code: pipeline tracking, offer 
 | `data/follow-ups.md` | Follow-up history tracker |
 | `scan.mjs` | Zero-token portal scanner — hits Greenhouse/Ashby/Lever APIs directly, zero LLM cost |
 | `cache-company.mjs` | Auto-cache companies to portals.yml after high-score evaluations |
+| `pass-history.mjs` | URL-keyed persistent state tracker (light pass + deep pass dedup) |
+| `data/pass-history.tsv` | Single source of truth for what URLs have been light/deep passed |
 | `check-liveness.mjs` | Job posting liveness checker |
 | `liveness-core.mjs` | Shared liveness logic (expired signals win over generic Apply text) |
 | `reports/` | Evaluation reports (format: `{###}-{company-slug}-{YYYY-MM-DD}.md`). Blocks A-F + G (Posting Legitimacy). Header includes `**Legitimacy:** {tier}`. |

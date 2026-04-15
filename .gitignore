@@ -2,6 +2,7 @@
 data/applications.md
 data/pipeline.md
 data/scan-history.tsv
+data/pass-history.tsv
 reports/*.md
 !reports/.gitkeep
 output/*
@@ -38,6 +39,7 @@ bun.lock
 # Claude Code local
 .claude/settings.local.json
 .claude/memory/
+.claude/projects/
 career-dashboard
 career-dashboard.exe
 dashboard/career-dashboard.exe

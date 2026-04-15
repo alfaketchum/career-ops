@@ -29,6 +29,7 @@ START_FROM=0
 MAX_RETRIES=2
 MIN_SCORE=0
 SCREEN_MODE=false
+LIMIT=0
 
 usage() {
   cat <<'USAGE'
@@ -46,8 +47,9 @@ Options:
   --start-from N       Start from offer ID N (skip earlier IDs)
   --max-retries N      Max retry attempts per offer (default: 2)
   --min-score N        Skip PDF/tracker for offers scoring below N (default: 0 = off)
-  --screen             Fast lightweight pass (Haiku + no WebSearch + no PDF).
-                       Recommended for pass 1 of spray-and-pray workflow.
+  --screen             Priority-scoring pass (Haiku, no file writes).
+                       Writes scores to data/pass-history.tsv.
+  --limit N            Process only the first N unprocessed URLs (cost control)
   -h, --help           Show this help
 
 Files:
@@ -82,6 +84,7 @@ while [[ $# -gt 0 ]]; do
     --max-retries) MAX_RETRIES="$2"; shift 2 ;;
     --min-score) MIN_SCORE="$2"; shift 2 ;;
     --screen) SCREEN_MODE=true; shift ;;
+    --limit) LIMIT="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -392,20 +395,16 @@ process_offer() {
       score="$score_match"
     fi
 
-    # Screen mode: append priority score to priority-scores.tsv, skip min-score gate
+    # Screen mode: record light pass in pass-history.tsv
     if [[ "$SCREEN_MODE" == "true" ]]; then
-      local scores_file="$BATCH_DIR/priority-scores.tsv"
       local company=""
       company=$(sed -nE 's/.*"company":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
       local role=""
       role=$(sed -nE 's/.*"role":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
-      local reason=""
-      reason=$(sed -nE 's/.*"reason":[[:space:]]*"([^"]*)".*/\1/p' "$log_file" 2>/dev/null | head -1 || true)
-      # Ensure header exists
-      if [[ ! -f "$scores_file" ]]; then
-        echo -e "id\turl\tcompany\trole\tscore\treason" > "$scores_file"
-      fi
-      echo -e "${id}\t${url}\t${company}\t${role}\t${score}\t${reason}" >> "$scores_file"
+
+      # URL-keyed persistent record
+      (cd "$PROJECT_DIR" && node pass-history.mjs light "$url" "$company" "$role" "$score" >/dev/null 2>&1) || true
+
       update_state "$id" "$url" "completed" "$started_at" "$completed_at" "screen" "$score" "-" "$retries"
       echo "    ✅ Scored: $score ($company)"
       return
@@ -419,6 +418,9 @@ process_offer() {
         continue
       fi
     fi
+
+    # URL-keyed persistent record (deep pass)
+    (cd "$PROJECT_DIR" && node pass-history.mjs deep "$url" "$report_num" "$score" >/dev/null 2>&1) || true
 
     update_state "$id" "$url" "completed" "$started_at" "$completed_at" "$report_num" "$score" "-" "$retries"
     echo "    ✅ Completed (score: $score, report: $report_num)"
@@ -501,7 +503,33 @@ main() {
   echo "=== career-ops batch runner ==="
   echo "Parallel: $PARALLEL | Max retries: $MAX_RETRIES"
   echo "Input: $total_input offers"
+  if (( LIMIT > 0 )); then
+    echo "Limit: $LIMIT (stop after processing N URLs)"
+  fi
   echo ""
+
+  # Preload already-done URLs from pass-history.tsv (URL-keyed persistent dedup)
+  DONE_URLS_FILE="$(mktemp -t "career-ops-done-urls.XXXXXX")"
+  trap 'rm -f "$DONE_URLS_FILE"' EXIT
+  local history_file="$PROJECT_DIR/data/pass-history.tsv"
+  if [[ -f "$history_file" ]]; then
+    if [[ "$SCREEN_MODE" == "true" ]]; then
+      # Light pass: skip rows with light_score already filled (col 4)
+      awk -F'\t' 'NR>1 && $4 != "-" && $4 != "" { print $1 }' "$history_file" > "$DONE_URLS_FILE"
+    else
+      # Deep pass: skip rows with deep_report already filled (col 6)
+      awk -F'\t' 'NR>1 && $6 != "-" && $6 != "" { print $1 }' "$history_file" > "$DONE_URLS_FILE"
+    fi
+    local done_count
+    done_count=$(wc -l < "$DONE_URLS_FILE" 2>/dev/null || echo 0)
+    done_count=$(echo "$done_count" | tr -d '[:space:]')
+    if (( done_count > 0 )); then
+      local pass_label="deep"
+      [[ "$SCREEN_MODE" == "true" ]] && pass_label="light"
+      echo "History: $done_count URLs already ${pass_label}-passed (will be skipped)"
+      echo ""
+    fi
+  fi
 
   # Build list of offers to process
   local -a pending_ids=()
@@ -552,10 +580,25 @@ main() {
       fi
     fi
 
+    # URL-keyed dedup via pass-history.tsv (persistent across batch resets)
+    if [[ -n "${DONE_URLS_FILE:-}" && -f "$DONE_URLS_FILE" ]]; then
+      if grep -Fxq "$url" "$DONE_URLS_FILE" 2>/dev/null; then
+        local pass_type="deep"
+        [[ "$SCREEN_MODE" == "true" ]] && pass_type="light"
+        echo "SKIP #$id: already ${pass_type}-passed"
+        continue
+      fi
+    fi
+
     pending_ids+=("$id")
     pending_urls+=("$url")
     pending_sources+=("$source")
     pending_notes+=("$notes")
+
+    # --limit N: stop adding after N URLs
+    if (( LIMIT > 0 && ${#pending_ids[@]} >= LIMIT )); then
+      break
+    fi
   done < "$INPUT_FILE"
 
   local pending_count=${#pending_ids[@]}
@@ -630,18 +673,12 @@ main() {
     merge_tracker
   else
     echo ""
-    echo "=== Screen pass complete ==="
-    local scores_file="$BATCH_DIR/priority-scores.tsv"
-    if [[ -f "$scores_file" ]]; then
-      local scored_count
-      scored_count=$(($(wc -l < "$scores_file") - 1))
-      echo "Priority scores written to: $scores_file ($scored_count URLs)"
-    fi
+    echo "=== Light pass complete ==="
+    (cd "$PROJECT_DIR" && node pass-history.mjs status) || true
     echo ""
     echo "Next step: reorder the queue by priority and run deep pass:"
     echo "  node batch/sort-queue.mjs"
-    echo "  rm -f batch/batch-state.tsv"
-    echo "  bash batch/batch-runner.sh --parallel 3"
+    echo "  bash batch/batch-runner.sh --parallel 3 --limit 20"
   fi
 
   # Print summary

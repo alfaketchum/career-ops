@@ -5,51 +5,72 @@ Process multiple job offers in parallel via `claude -p` workers. Each worker run
 ## Always Be Applying — Two-Pass Workflow
 
 **Philosophy:** Every URL from the scanner will eventually get a full deep evaluation.
-The screen pass doesn't FILTER — it just ORDERS the queue so high-priority jobs
-are processed first. You can stop mid-batch and resume later; top priorities already
-have reports + PDFs.
+The light pass doesn't FILTER — it orders the queue so high-priority jobs are
+processed first. You control cost with `--limit N` on the deep pass.
 
-### Pass 1 — SCREEN (Haiku 4.5, priority scoring only)
+### State: `data/pass-history.tsv` (URL-keyed, persistent)
 
-Scores every URL on 4 dimensions (role fit, experience, remote, red flags).
-**No reports, no tracker entries, no PDFs** — just priority scores.
-~20s per offer.
+Single source of truth for what's been processed. Columns:
+`url | company | role | light_score | light_at | deep_report | deep_score | deep_at`
+
+- Light pass: skips URLs where `light_score` is set
+- Deep pass: skips URLs where `deep_report` is set
+- Survives weekly scans, batch resets, anything
+
+Check status any time:
+```bash
+node pass-history.mjs status
+```
+
+### Step 1 — LIGHT pass (Haiku 4.5, priority scoring)
+
+Scores every new URL on 4 dimensions. **No files written** except
+`data/pass-history.tsv`. ~20s per offer.
 
 ```bash
 bash batch/batch-runner.sh --screen --parallel 5
 ```
 
-Output: `batch/priority-scores.tsv` with one row per URL.
+Already-light-passed URLs are skipped automatically.
 
-### Sort the queue
+### Step 2 — Sort the queue
 
-Reorder `batch-input.tsv` by priority score (highest first):
+Reorder `batch-input.tsv` by light score:
 
 ```bash
 node batch/sort-queue.mjs
-# Overwrites batch-input.tsv; backs up the original as batch-input.unsorted.tsv
+# Already deep-done URLs are pushed to the end
 ```
 
-### Pass 2 — DEEP (Sonnet 4.5, full quality)
+### Step 3 — DEEP pass (Sonnet 4.5, full quality + cost cap)
 
-Full A-G evaluation, WebSearch for comp/culture, tailored PDF CV, tracker entry.
-Processes in priority order. You can stop mid-run and resume later.
+Full A-G evaluation, WebSearch, tailored PDF CV, tracker entry.
+Use `--limit N` to cap cost per run.
 
 ```bash
-rm -f batch/batch-state.tsv  # reset state for the new ordered queue
-bash batch/batch-runner.sh --parallel 3
+# First 20 top-priority URLs
+bash batch/batch-runner.sh --parallel 3 --limit 20
 
-# Max quality mode (Opus):
-CLAUDE_MODEL=claude-opus-4-5 bash batch/batch-runner.sh --parallel 2
+# Next 20 tomorrow
+bash batch/batch-runner.sh --parallel 3 --limit 20
+
+# Max quality (Opus) on top 5
+CLAUDE_MODEL=claude-opus-4-5 bash batch/batch-runner.sh --parallel 2 --limit 5
 ```
 
-**Cost on 150 URLs (all get evaluated — just in priority order):**
-- Screen pass (Haiku): ~$2-3
-- Deep pass all (Sonnet): ~$15-20
-- **Total: ~$17-23**
+Already-deep-passed URLs are skipped automatically — no duplicate reports.
 
-vs. skipping screen (all random order, same cost but worse prioritization).
-vs. all-Opus (~$40-60 for the same deep pass).
+### Resumability & weekly cron
+
+Run the scanner weekly (Monday cron). New URLs get added to `batch-input.tsv`.
+Light-pass them, sort the queue, and resume the deep pass. The history file
+ensures nothing is re-evaluated.
+
+**Cost control example (150 URLs over a few days):**
+- Light pass all 150 (Haiku): ~$2-3
+- Deep pass top 20 today (Sonnet): ~$4-5
+- Deep pass next 20 tomorrow: ~$4-5
+- ...spread the cost out; stop whenever you want
 
 ## Quick Start
 
