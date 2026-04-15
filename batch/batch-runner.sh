@@ -255,6 +255,8 @@ next_report_num_unlocked() {
   if [[ -f "$STATE_FILE" ]]; then
     while IFS=$'\t' read -r _ _ _ _ _ rnum _ _ _; do
       [[ "$rnum" == "report_num" || "$rnum" == "-" || -z "$rnum" ]] && continue
+      # Skip non-numeric report nums (e.g. "screen" placeholder from light pass)
+      [[ ! "$rnum" =~ ^[0-9]+$ ]] && continue
       local n=$((10#$rnum))
       if (( n > max_num )); then
         max_num=$n
@@ -335,14 +337,29 @@ process_offer() {
 
   echo "--- Processing offer #$id: $url (report $report_num, attempt $((retries + 1)))"
 
-  # Build the prompt with placeholders replaced
+  # Build the prompt with placeholders replaced.
+  # Screen mode: just score and emit JSON (NO files). Deep mode: full pipeline.
   local prompt
-  prompt="Procesa esta oferta de empleo. Ejecuta el pipeline completo: evaluación A-F + report .md + PDF + tracker line."
-  prompt="$prompt URL: $url"
-  prompt="$prompt JD file: $jd_file"
-  prompt="$prompt Report number: $report_num"
-  prompt="$prompt Date: $date"
-  prompt="$prompt Batch ID: $id"
+  if [[ "$SCREEN_MODE" == "true" ]]; then
+    # notes field is "Company - Role title" — split on first " - "
+    local company="${notes%% - *}"
+    local role="${notes#* - }"
+    [[ "$company" == "$notes" ]] && company="unknown"
+    [[ "$role" == "$notes" ]] && role="$notes"
+    prompt="Score this job per the SCREEN system prompt."
+    prompt="$prompt URL: $url"
+    prompt="$prompt Company: $company"
+    prompt="$prompt Role: $role"
+    prompt="$prompt Batch ID: $id"
+    prompt="$prompt Output ONE JSON line. Do not fetch the URL."
+  else
+    prompt="Procesa esta oferta de empleo. Ejecuta el pipeline completo: evaluación A-F + report .md + PDF + tracker line."
+    prompt="$prompt URL: $url"
+    prompt="$prompt JD file: $jd_file"
+    prompt="$prompt Report number: $report_num"
+    prompt="$prompt Date: $date"
+    prompt="$prompt Batch ID: $id"
+  fi
 
   local log_file="$LOGS_DIR/${report_num}-${id}.log"
 
@@ -372,12 +389,21 @@ process_offer() {
     default_model="claude-haiku-4-5"
   fi
   local model="${CLAUDE_MODEL:-$default_model}"
+
+  # Screen mode: lock tools to Read only (no Bash, no fetch, no edits).
+  # Deep mode: full toolset.
+  local tool_args=()
+  if [[ "$SCREEN_MODE" == "true" ]]; then
+    tool_args=(--tools "Read")
+  fi
+
   local exit_code=0
   claude -p \
     --model "$model" \
     --dangerously-skip-permissions \
     --append-system-prompt-file "$resolved_prompt" \
-    "$prompt" \
+    "${tool_args[@]}" \
+    -- "$prompt" \
     > "$log_file" 2>&1 || exit_code=$?
 
   # Cleanup resolved prompt

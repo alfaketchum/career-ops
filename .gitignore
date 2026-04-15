@@ -3,6 +3,9 @@ data/applications.md
 data/pipeline.md
 data/scan-history.tsv
 data/pass-history.tsv
+.playwright-auth/
+batch/batch-runner.pid
+career-dashboard.exe~
 reports/*.md
 !reports/.gitkeep
 output/*
