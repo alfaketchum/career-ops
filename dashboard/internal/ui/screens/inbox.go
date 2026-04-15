@@ -2,6 +2,7 @@ package screens
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,67 +20,94 @@ type InboxOpenURLMsg struct {
 	URL string
 }
 
-// InboxModel shows pending URLs from data/pipeline.md.
+// InboxFilter controls which items are shown.
+type InboxFilter int
+
+const (
+	FilterAll InboxFilter = iota
+	FilterUntouched
+	FilterLightOnly
+	FilterDeepDone
+)
+
+func (f InboxFilter) Label() string {
+	switch f {
+	case FilterAll:
+		return "All"
+	case FilterUntouched:
+		return "Untouched"
+	case FilterLightOnly:
+		return "Light-passed"
+	case FilterDeepDone:
+		return "Deep-done"
+	}
+	return "?"
+}
+
+// InboxModel shows the full processing queue with light/deep pass state.
 type InboxModel struct {
 	items        []model.PipelineInboxItem
 	filtered     []model.PipelineInboxItem
+	stats        model.PipelineInboxStats
 	cursor       int
 	scrollOffset int
-	filter       string // "all", "pending", "processed", or a source name
+	filter       InboxFilter
 	width        int
 	height       int
 	theme        theme.Theme
 }
 
 // NewInboxModel creates a new inbox screen.
-func NewInboxModel(t theme.Theme, items []model.PipelineInboxItem, width, height int) InboxModel {
+func NewInboxModel(t theme.Theme, items []model.PipelineInboxItem, stats model.PipelineInboxStats, width, height int) InboxModel {
 	m := InboxModel{
 		items:  items,
+		stats:  stats,
 		width:  width,
 		height: height,
 		theme:  t,
-		filter: "pending",
+		filter: FilterAll,
 	}
 	m.applyFilter()
 	return m
 }
 
-// Init implements tea.Model.
 func (m InboxModel) Init() tea.Cmd { return nil }
 
-// Resize updates dimensions.
 func (m *InboxModel) Resize(width, height int) {
 	m.width = width
 	m.height = height
 }
 
-// Width returns the current width.
-func (m InboxModel) Width() int { return m.width }
-
-// Height returns the current height.
+func (m InboxModel) Width() int  { return m.width }
 func (m InboxModel) Height() int { return m.height }
 
 func (m *InboxModel) applyFilter() {
 	m.filtered = m.filtered[:0]
 	for _, it := range m.items {
+		hasLight := it.LightScore > 0
+		hasDeep := it.DeepReport != ""
+		keep := false
 		switch m.filter {
-		case "all":
+		case FilterAll:
+			keep = true
+		case FilterUntouched:
+			keep = !hasLight && !hasDeep
+		case FilterLightOnly:
+			keep = hasLight && !hasDeep
+		case FilterDeepDone:
+			keep = hasDeep
+		}
+		if keep {
 			m.filtered = append(m.filtered, it)
-		case "pending":
-			if !it.Processed {
-				m.filtered = append(m.filtered, it)
-			}
-		case "processed":
-			if it.Processed {
-				m.filtered = append(m.filtered, it)
-			}
-		default:
-			// Source filter
-			if it.Source == m.filter {
-				m.filtered = append(m.filtered, it)
-			}
 		}
 	}
+	// Sort: deep-done first by deep score, then light-passed by light score, then untouched at bottom
+	sort.SliceStable(m.filtered, func(i, j int) bool {
+		a, b := m.filtered[i], m.filtered[j]
+		aKey := sortKey(a)
+		bKey := sortKey(b)
+		return aKey > bKey
+	})
 	if m.cursor >= len(m.filtered) {
 		m.cursor = len(m.filtered) - 1
 	}
@@ -88,7 +116,19 @@ func (m *InboxModel) applyFilter() {
 	}
 }
 
-// Update handles input for the inbox screen.
+// sortKey produces a numeric key for sorting: deep-done items score highest,
+// then light-passed items by light score, then untouched at the bottom.
+func sortKey(it model.PipelineInboxItem) float64 {
+	if it.DeepReport != "" {
+		// Rank deep-done above light-passed by a large offset, tie-break by deep score
+		return 100.0 + it.DeepScore
+	}
+	if it.LightScore > 0 {
+		return it.LightScore
+	}
+	return 0.0
+}
+
 func (m InboxModel) Update(msg tea.Msg) (InboxModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -142,17 +182,22 @@ func (m InboxModel) Update(msg tea.Msg) (InboxModel, tea.Cmd) {
 			}
 
 		case "1":
-			m.filter = "all"
+			m.filter = FilterAll
 			m.cursor = 0
 			m.scrollOffset = 0
 			m.applyFilter()
 		case "2":
-			m.filter = "pending"
+			m.filter = FilterUntouched
 			m.cursor = 0
 			m.scrollOffset = 0
 			m.applyFilter()
 		case "3":
-			m.filter = "processed"
+			m.filter = FilterLightOnly
+			m.cursor = 0
+			m.scrollOffset = 0
+			m.applyFilter()
+		case "4":
+			m.filter = FilterDeepDone
 			m.cursor = 0
 			m.scrollOffset = 0
 			m.applyFilter()
@@ -165,8 +210,8 @@ func (m InboxModel) Update(msg tea.Msg) (InboxModel, tea.Cmd) {
 }
 
 func (m *InboxModel) visibleRows() int {
-	// Header + tabs + column headers + footer = ~6 rows overhead
-	v := m.height - 6
+	// Header (2) + stats (1) + tabs (1) + col hdr (2) + footer (2) = ~8 overhead
+	v := m.height - 8
 	if v < 1 {
 		return 1
 	}
@@ -186,22 +231,29 @@ func (m *InboxModel) adjustScroll() {
 	}
 }
 
-// View renders the inbox.
 func (m InboxModel) View() string {
 	th := m.theme
 
-	headerStyle := lipgloss.NewStyle().
-		Foreground(th.Mauve).
-		Bold(true).
-		Padding(0, 1)
-
+	headerStyle := lipgloss.NewStyle().Foreground(th.Mauve).Bold(true).Padding(0, 1)
+	statsStyle := lipgloss.NewStyle().Foreground(th.Subtext).Padding(0, 1)
 	tabStyle := lipgloss.NewStyle().Foreground(th.Subtext).Padding(0, 1)
 	activeTabStyle := lipgloss.NewStyle().Foreground(th.Mauve).Bold(true).Padding(0, 1)
-
 	rowStyle := lipgloss.NewStyle().Foreground(th.Text)
-	cursorStyle := lipgloss.NewStyle().Foreground(th.Mauve).Bold(true)
 	mutedStyle := lipgloss.NewStyle().Foreground(th.Subtext)
-	processedStyle := lipgloss.NewStyle().Foreground(th.Subtext).Strikethrough(true)
+	cursorStyle := lipgloss.NewStyle().Foreground(th.Mauve).Bold(true)
+
+	scoreColor := func(score float64) lipgloss.Style {
+		switch {
+		case score >= 4.0:
+			return lipgloss.NewStyle().Foreground(th.Green).Bold(true)
+		case score >= 3.0:
+			return lipgloss.NewStyle().Foreground(th.Yellow)
+		case score > 0:
+			return lipgloss.NewStyle().Foreground(th.Peach)
+		default:
+			return lipgloss.NewStyle().Foreground(th.Subtext)
+		}
+	}
 
 	sourceColor := func(src string) lipgloss.Style {
 		switch src {
@@ -216,31 +268,30 @@ func (m InboxModel) View() string {
 
 	var b strings.Builder
 
-	// Header
-	total := len(m.items)
-	pending := 0
-	processed := 0
-	for _, it := range m.items {
-		if it.Processed {
-			processed++
-		} else {
-			pending++
-		}
-	}
-	title := fmt.Sprintf("Pipeline Inbox — %d pending / %d processed / %d total", pending, processed, total)
-	b.WriteString(headerStyle.Render(title))
-	b.WriteString("\n\n")
+	// Title + stats line
+	b.WriteString(headerStyle.Render("Pipeline Inbox — Always Be Applying"))
+	b.WriteString("\n")
+	stats := fmt.Sprintf(
+		"Total: %d  •  Untouched: %d  •  Light-only: %d  •  Deep-done: %d",
+		m.stats.Total, m.stats.Untouched, m.stats.LightOnly, m.stats.DeepDone,
+	)
+	b.WriteString(statsStyle.Render(stats))
+	b.WriteString("\n")
 
 	// Tabs
-	tabs := []struct{ key, label, filter string }{
-		{"1", "All", "all"},
-		{"2", "Pending", "pending"},
-		{"3", "Processed", "processed"},
+	tabs := []struct {
+		key string
+		f   InboxFilter
+	}{
+		{"1", FilterAll},
+		{"2", FilterUntouched},
+		{"3", FilterLightOnly},
+		{"4", FilterDeepDone},
 	}
 	var tabLine strings.Builder
 	for _, t := range tabs {
-		label := fmt.Sprintf("[%s] %s", t.key, t.label)
-		if m.filter == t.filter {
+		label := fmt.Sprintf("[%s] %s", t.key, t.f.Label())
+		if m.filter == t.f {
 			tabLine.WriteString(activeTabStyle.Render(label))
 		} else {
 			tabLine.WriteString(tabStyle.Render(label))
@@ -252,24 +303,25 @@ func (m InboxModel) View() string {
 	// Column widths
 	numW := 4
 	sourceW := 11
-	companyW := 24
-	roleW := 48
-	if m.width < 100 {
-		roleW = m.width - numW - sourceW - companyW - 6
-		if roleW < 10 {
-			roleW = 10
-		}
+	lightW := 7
+	deepW := 14 // shows "042 (4.5/5)" or "—"
+	companyW := 22
+	roleW := m.width - numW - sourceW - lightW - deepW - companyW - 10
+	if roleW < 12 {
+		roleW = 12
 	}
 
-	// Column headers
-	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s",
+	// Column header
+	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %-*s",
 		numW, "#",
 		sourceW, "SOURCE",
+		lightW, "LIGHT",
+		deepW, "DEEP",
 		companyW, "COMPANY",
 		roleW, "ROLE")
 	b.WriteString(mutedStyle.Render(hdr))
 	b.WriteString("\n")
-	b.WriteString(mutedStyle.Render(strings.Repeat("─", numW+sourceW+companyW+roleW+6)))
+	b.WriteString(mutedStyle.Render(strings.Repeat("─", numW+sourceW+lightW+deepW+companyW+roleW+10)))
 	b.WriteString("\n")
 
 	// Rows
@@ -288,39 +340,46 @@ func (m InboxModel) View() string {
 			if i == m.cursor {
 				cursor = "▸ "
 			}
+
+			lightStr := "—"
+			if it.LightScore > 0 {
+				lightStr = fmt.Sprintf("%.1f", it.LightScore)
+			}
+			deepStr := "—"
+			if it.DeepReport != "" {
+				deepStr = fmt.Sprintf("%s (%.1f)", it.DeepReport, it.DeepScore)
+			}
+
 			company := truncate(it.Company, companyW)
 			role := truncate(it.Role, roleW)
-			line := fmt.Sprintf("%-*d  %-*s  %-*s  %-*s",
-				numW, it.Number,
-				sourceW, "",
-				companyW, company,
-				roleW, role)
-			sourceRendered := sourceColor(it.Source).Render(fmt.Sprintf("%-*s", sourceW, it.Source))
-			// Rebuild with colored source
-			parts := strings.SplitN(line, fmt.Sprintf("%-*s", sourceW, ""), 2)
-			if len(parts) == 2 {
-				line = parts[0] + sourceRendered + parts[1]
-			}
 
-			if it.Processed {
-				line = processedStyle.Render(line)
-			} else if i == m.cursor {
-				line = cursorStyle.Render(cursor + line[2:])
+			// Assemble row with colored components
+			numCol := fmt.Sprintf("%-*d", numW, it.Number)
+			srcCol := sourceColor(it.Source).Render(fmt.Sprintf("%-*s", sourceW, it.Source))
+			lightCol := scoreColor(it.LightScore).Render(fmt.Sprintf("%-*s", lightW, lightStr))
+			var deepCol string
+			if it.DeepReport != "" {
+				deepCol = scoreColor(it.DeepScore).Bold(true).Render(fmt.Sprintf("%-*s", deepW, deepStr))
 			} else {
-				line = rowStyle.Render(line)
+				deepCol = mutedStyle.Render(fmt.Sprintf("%-*s", deepW, deepStr))
 			}
+			companyCol := fmt.Sprintf("%-*s", companyW, company)
+			roleCol := fmt.Sprintf("%-*s", roleW, role)
 
-			if i != m.cursor {
-				b.WriteString(cursor)
+			line := fmt.Sprintf("%s%s  %s  %s  %s  %s  %s", cursor, numCol, srcCol, lightCol, deepCol, companyCol, roleCol)
+
+			if i == m.cursor {
+				b.WriteString(cursorStyle.Render(line))
+			} else {
+				b.WriteString(rowStyle.Render(line))
 			}
-			b.WriteString(line)
 			b.WriteString("\n")
 		}
 	}
 
 	// Footer
 	b.WriteString("\n")
-	footer := "↑/↓ navigate  1/2/3 filter  o/enter open URL  q back"
+	footer := "↑/↓ navigate  1/2/3/4 filter  o/enter open URL  q back"
 	b.WriteString(mutedStyle.Render(footer))
 
 	return b.String()

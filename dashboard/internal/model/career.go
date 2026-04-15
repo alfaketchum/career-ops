@@ -1,13 +1,33 @@
 package model
 
-// PipelineInboxItem represents a pending URL from data/pipeline.md.
+// PipelineInboxItem represents a URL in the processing pipeline,
+// enriched with light-pass and deep-pass state from data/pass-history.tsv.
 type PipelineInboxItem struct {
 	Number    int
 	URL       string
 	Company   string
 	Role      string
 	Source    string // linkedin, glassdoor, greenhouse, lever, ashby, etc.
-	Processed bool   // true if marked [x], false if [ ]
+	Processed bool   // true if marked [x] in pipeline.md
+
+	// Light-pass state (from data/pass-history.tsv)
+	LightScore float64 // 0 = not light-passed
+	LightAt    string  // YYYY-MM-DD when scored
+
+	// Deep-pass state (from data/pass-history.tsv)
+	DeepReport string  // report number, empty if not deep-passed
+	DeepScore  float64 // 0 if not deep-passed
+	DeepAt     string  // YYYY-MM-DD when deep-evaluated
+}
+
+// PipelineInboxStats aggregates the inbox for the header row.
+type PipelineInboxStats struct {
+	Total       int
+	Untouched   int // no light, no deep
+	LightOnly   int // light done, deep pending
+	DeepDone    int // deep done (with or without light)
+	AvgLight    float64
+	AvgDeep     float64
 }
 
 // CareerApplication represents a single job application from the tracker.

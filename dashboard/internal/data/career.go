@@ -162,11 +162,73 @@ func ParseApplications(careerOpsPath string) []model.CareerApplication {
 	return apps
 }
 
-// ParsePipelineInbox reads data/pipeline.md and returns all inbox items.
-// Format per line: "- [ ] {url} | {company} | {role}" (pending)
-//                  "- [x] {url} | {company} | {role}" (processed)
+// passHistoryEntry is an internal representation of one row in data/pass-history.tsv.
+type passHistoryEntry struct {
+	Company    string
+	Role       string
+	LightScore float64
+	LightAt    string
+	DeepReport string
+	DeepScore  float64
+	DeepAt     string
+}
+
+// loadPassHistory reads data/pass-history.tsv and returns a map url -> entry.
+func loadPassHistory(careerOpsPath string) map[string]passHistoryEntry {
+	out := make(map[string]passHistoryEntry)
+	paths := []string{
+		filepath.Join(careerOpsPath, "data", "pass-history.tsv"),
+		filepath.Join(careerOpsPath, "pass-history.tsv"),
+	}
+	var content []byte
+	var err error
+	for _, p := range paths {
+		content, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return out
+	}
+	lines := strings.Split(string(content), "\n")
+	for i, line := range lines {
+		if i == 0 || strings.TrimSpace(line) == "" {
+			continue // skip header and blank lines
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 8 {
+			continue
+		}
+		url := fields[0]
+		entry := passHistoryEntry{
+			Company: fields[1],
+			Role:    fields[2],
+			LightAt: fields[4],
+			DeepAt:  fields[7],
+		}
+		if fields[3] != "-" && fields[3] != "" {
+			if s, err := strconv.ParseFloat(fields[3], 64); err == nil {
+				entry.LightScore = s
+			}
+		}
+		if fields[5] != "-" && fields[5] != "" {
+			entry.DeepReport = fields[5]
+		}
+		if fields[6] != "-" && fields[6] != "" {
+			if s, err := strconv.ParseFloat(fields[6], 64); err == nil {
+				entry.DeepScore = s
+			}
+		}
+		out[url] = entry
+	}
+	return out
+}
+
+// ParsePipelineInbox reads data/pipeline.md, enriches each URL with
+// light-pass and deep-pass state from data/pass-history.tsv, and returns
+// the combined items.
 func ParsePipelineInbox(careerOpsPath string) []model.PipelineInboxItem {
-	// Try data/pipeline.md first, then pipeline.md
 	paths := []string{
 		filepath.Join(careerOpsPath, "data", "pipeline.md"),
 		filepath.Join(careerOpsPath, "pipeline.md"),
@@ -183,6 +245,8 @@ func ParsePipelineInbox(careerOpsPath string) []model.PipelineInboxItem {
 	if err != nil {
 		return nil
 	}
+
+	history := loadPassHistory(careerOpsPath)
 
 	items := make([]model.PipelineInboxItem, 0)
 	num := 0
@@ -204,17 +268,68 @@ func ParsePipelineInbox(careerOpsPath string) []model.PipelineInboxItem {
 		company := strings.TrimSpace(m[3])
 		role := strings.TrimSpace(m[4])
 
-		items = append(items, model.PipelineInboxItem{
+		item := model.PipelineInboxItem{
 			Number:    num,
 			URL:       url,
 			Company:   company,
 			Role:      role,
 			Source:    detectSource(url),
 			Processed: processed,
-		})
+		}
+
+		// Enrich with pass-history state
+		if entry, ok := history[url]; ok {
+			if entry.Company != "" {
+				item.Company = entry.Company
+			}
+			if entry.Role != "" {
+				item.Role = entry.Role
+			}
+			item.LightScore = entry.LightScore
+			item.LightAt = entry.LightAt
+			item.DeepReport = entry.DeepReport
+			item.DeepScore = entry.DeepScore
+			item.DeepAt = entry.DeepAt
+		}
+
+		items = append(items, item)
 	}
 
 	return items
+}
+
+// ComputeInboxStats aggregates inbox items for the header row.
+func ComputeInboxStats(items []model.PipelineInboxItem) model.PipelineInboxStats {
+	s := model.PipelineInboxStats{Total: len(items)}
+	var lightSum, deepSum float64
+	var lightCount, deepCount int
+	for _, it := range items {
+		hasLight := it.LightScore > 0
+		hasDeep := it.DeepReport != ""
+		switch {
+		case hasDeep:
+			s.DeepDone++
+			deepSum += it.DeepScore
+			deepCount++
+			if hasLight {
+				lightSum += it.LightScore
+				lightCount++
+			}
+		case hasLight:
+			s.LightOnly++
+			lightSum += it.LightScore
+			lightCount++
+		default:
+			s.Untouched++
+		}
+	}
+	if lightCount > 0 {
+		s.AvgLight = lightSum / float64(lightCount)
+	}
+	if deepCount > 0 {
+		s.AvgDeep = deepSum / float64(deepCount)
+	}
+	return s
 }
 
 // detectSource returns a short label for the job board from a URL.

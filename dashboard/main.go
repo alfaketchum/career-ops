@@ -65,7 +65,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case screens.PipelineOpenInboxMsg:
 		items := data.ParsePipelineInbox(m.careerOpsPath)
-		m.inbox = screens.NewInboxModel(m.theme, items, m.pipeline.Width(), m.pipeline.Height())
+		stats := data.ComputeInboxStats(items)
+		m.inbox = screens.NewInboxModel(m.theme, items, stats, m.pipeline.Width(), m.pipeline.Height())
 		m.state = viewInbox
 		return m, nil
 
