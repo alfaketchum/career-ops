@@ -64,6 +64,7 @@ AI-powered job search automation built on Claude Code: pipeline tracking, offer 
 | `scan.mjs` | Zero-token portal scanner — hits Greenhouse/Ashby/Lever APIs directly, zero LLM cost |
 | `cache-company.mjs` | Auto-cache companies to portals.yml after high-score evaluations |
 | `pass-history.mjs` | URL-keyed persistent state tracker (light pass + deep pass dedup) |
+| `web/server.mjs` | Browser dashboard server (read-only). Run: `npm run web` → http://localhost:3000 |
 | `data/pass-history.tsv` | Single source of truth for what URLs have been light/deep passed |
 | `check-liveness.mjs` | Job posting liveness checker |
 | `liveness-core.mjs` | Shared liveness logic (expired signals win over generic Apply text) |

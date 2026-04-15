@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>career-ops dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">⚡</span>
+      <span class="title">career-ops</span>
+      <span class="tagline">Always Be Applying</span>
+    </div>
+    <nav id="tabs">
+      <a href="#/overview" data-tab="overview">Overview</a>
+      <a href="#/inbox" data-tab="inbox">Inbox</a>
+      <a href="#/tracker" data-tab="tracker">Tracker</a>
+      <a href="#/progress" data-tab="progress">Progress</a>
+      <a href="#/profile" data-tab="profile">Profile</a>
+    </nav>
+    <div class="status">
+      <span id="connection-status" class="dot"></span>
+      <span id="last-updated">—</span>
+    </div>
+  </header>
+
+  <main id="content">
+    <div class="loading">Loading…</div>
+  </main>
+
+  <footer>
+    <span>career-ops · read-only · refresh: <kbd>R</kbd></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
