@@ -298,6 +298,146 @@ func ParsePipelineInbox(careerOpsPath string) []model.PipelineInboxItem {
 	return items
 }
 
+// loadScanStats reads data/scan-history.tsv and computes scanner stats.
+func loadScanStats(careerOpsPath string) model.ScanStats {
+	stats := model.ScanStats{BySource: make(map[string]int)}
+	paths := []string{
+		filepath.Join(careerOpsPath, "data", "scan-history.tsv"),
+		filepath.Join(careerOpsPath, "scan-history.tsv"),
+	}
+	var content []byte
+	var err error
+	for _, p := range paths {
+		content, err = os.ReadFile(p)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return stats
+	}
+	for i, line := range strings.Split(string(content), "\n") {
+		if i == 0 || strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 6 {
+			continue
+		}
+		date := fields[1]
+		portal := fields[2]
+		status := fields[5]
+		stats.TotalSeen++
+		switch status {
+		case "added":
+			stats.Added++
+		case "skipped_title":
+			stats.SkippedTitle++
+		case "skipped_dup":
+			stats.SkippedDup++
+		case "skipped_expired":
+			stats.SkippedExpired++
+		}
+		if date > stats.LastScanDate {
+			stats.LastScanDate = date
+		}
+		// Source = first word of portal (e.g., "LinkedIn" from "LinkedIn — FP&A Remote")
+		if portal != "" {
+			parts := strings.Fields(portal)
+			if len(parts) > 0 {
+				stats.BySource[parts[0]]++
+			}
+		}
+	}
+	return stats
+}
+
+// ComputeOverview aggregates everything into a single overview snapshot.
+func ComputeOverview(careerOpsPath string, apps []model.CareerApplication, items []model.PipelineInboxItem) model.Overview {
+	overview := model.Overview{
+		Scan:    loadScanStats(careerOpsPath),
+		Tracker: ComputeMetrics(apps),
+	}
+
+	// Inbox stats from items
+	for _, it := range items {
+		overview.InboxTotal++
+		if !it.Processed {
+			overview.InboxPending++
+		}
+	}
+
+	// Light + deep stats from items (already enriched from pass-history)
+	var lightSum, deepSum float64
+	var lightHigh, deepHigh float64
+	var lightDates, deepDates []string
+	type pendingDeep struct {
+		score                  float64
+		company, role, url     string
+	}
+	var pending []pendingDeep
+	for _, it := range items {
+		if it.LightScore > 0 {
+			overview.Light.Done++
+			lightSum += it.LightScore
+			if it.LightScore > lightHigh {
+				lightHigh = it.LightScore
+			}
+			if it.LightAt != "" {
+				lightDates = append(lightDates, it.LightAt)
+			}
+			if it.DeepReport == "" {
+				pending = append(pending, pendingDeep{it.LightScore, it.Company, it.Role, it.URL})
+			}
+		}
+		if it.DeepReport != "" {
+			overview.Deep.Done++
+			deepSum += it.DeepScore
+			if it.DeepScore > deepHigh {
+				deepHigh = it.DeepScore
+			}
+			if it.DeepAt != "" {
+				deepDates = append(deepDates, it.DeepAt)
+			}
+		}
+	}
+	if overview.Light.Done > 0 {
+		overview.Light.AvgScore = lightSum / float64(overview.Light.Done)
+		overview.Light.HighScore = lightHigh
+	}
+	if overview.Deep.Done > 0 {
+		overview.Deep.AvgScore = deepSum / float64(overview.Deep.Done)
+		overview.Deep.HighScore = deepHigh
+	}
+	overview.Light.Pending = overview.InboxPending - overview.Light.Done
+	if overview.Light.Pending < 0 {
+		overview.Light.Pending = 0
+	}
+	overview.Deep.Pending = len(pending)
+	if len(lightDates) > 0 {
+		sort.Strings(lightDates)
+		overview.Light.LastScored = lightDates[len(lightDates)-1]
+	}
+	if len(deepDates) > 0 {
+		sort.Strings(deepDates)
+		overview.Deep.LastDeepAt = deepDates[len(deepDates)-1]
+	}
+
+	// Top priorities = top 10 pending deep, sorted by light score desc
+	sort.SliceStable(pending, func(i, j int) bool { return pending[i].score > pending[j].score })
+	maxTop := 10
+	if len(pending) < maxTop {
+		maxTop = len(pending)
+	}
+	for i := 0; i < maxTop; i++ {
+		p := pending[i]
+		overview.TopPriorities = append(overview.TopPriorities, model.TopPriority{
+			Score: p.score, Company: p.company, Role: p.role, URL: p.url,
+		})
+	}
+	return overview
+}
+
 // ComputeInboxStats aggregates inbox items for the header row.
 func ComputeInboxStats(items []model.PipelineInboxItem) model.PipelineInboxStats {
 	s := model.PipelineInboxStats{Total: len(items)}

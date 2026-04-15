@@ -18,21 +18,35 @@ import (
 type viewState int
 
 const (
-	viewPipeline viewState = iota
+	viewOverview viewState = iota
+	viewPipeline
 	viewReport
 	viewProgress
 	viewInbox
+	viewProfile
 )
 
 type appModel struct {
+	overview        screens.OverviewModel
 	pipeline        screens.PipelineModel
 	viewer          screens.ViewerModel
 	progress        screens.ProgressModel
 	inbox           screens.InboxModel
+	profile         screens.ProfileModel
 	state           viewState
 	careerOpsPath   string
 	theme           theme.Theme
 	progressMetrics model.ProgressMetrics
+}
+
+func (m *appModel) reloadOverview() {
+	apps := data.ParseApplications(m.careerOpsPath)
+	if apps == nil {
+		apps = []model.CareerApplication{}
+	}
+	items := data.ParsePipelineInbox(m.careerOpsPath)
+	ov := data.ComputeOverview(m.careerOpsPath, apps, items)
+	m.overview = screens.NewOverviewModel(m.theme, ov, m.overview.Width(), m.overview.Height())
 }
 
 func (m *appModel) reloadPipelineData() {
@@ -49,6 +63,7 @@ func (m appModel) Init() tea.Cmd {
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.overview.Resize(msg.Width, msg.Height)
 		m.pipeline.Resize(msg.Width, msg.Height)
 		if m.state == viewReport {
 			m.viewer.Resize(msg.Width, msg.Height)
@@ -59,9 +74,34 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == viewInbox {
 			m.inbox.Resize(msg.Width, msg.Height)
 		}
+		if m.state == viewProfile {
+			m.profile.Resize(msg.Width, msg.Height)
+		}
 		pm, cmd := m.pipeline.Update(msg)
 		m.pipeline = pm
 		return m, cmd
+
+	// Overview navigation
+	case screens.OverviewClosedMsg:
+		return m, tea.Quit
+	case screens.OverviewOpenInboxMsg:
+		items := data.ParsePipelineInbox(m.careerOpsPath)
+		stats := data.ComputeInboxStats(items)
+		m.inbox = screens.NewInboxModel(m.theme, items, stats, m.overview.Width(), m.overview.Height())
+		m.state = viewInbox
+		return m, nil
+	case screens.OverviewOpenProfileMsg:
+		m.profile = screens.NewProfileModel(m.theme, m.careerOpsPath, m.overview.Width(), m.overview.Height())
+		m.state = viewProfile
+		return m, nil
+	case screens.OverviewOpenURLMsg:
+		url := msg.URL
+		return m, openURLCmd(url)
+
+	// Profile navigation
+	case screens.ProfileClosedMsg:
+		m.state = viewOverview
+		return m, nil
 
 	case screens.PipelineOpenInboxMsg:
 		items := data.ParsePipelineInbox(m.careerOpsPath)
@@ -71,26 +111,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case screens.InboxClosedMsg:
-		m.state = viewPipeline
+		// Return to whichever view we came from
+		if m.state == viewInbox {
+			m.state = viewOverview
+		}
 		return m, nil
 
 	case screens.InboxOpenURLMsg:
-		url := msg.URL
-		return m, func() tea.Msg {
-			var cmd *exec.Cmd
-			switch runtime.GOOS {
-			case "darwin":
-				cmd = exec.Command("open", url)
-			case "linux":
-				cmd = exec.Command("xdg-open", url)
-			case "windows":
-				cmd = exec.Command("cmd", "/c", "start", "", url)
-			default:
-				cmd = exec.Command("xdg-open", url)
-			}
-			_ = cmd.Run()
-			return nil
-		}
+		return m, openURLCmd(msg.URL)
 
 	case screens.PipelineClosedMsg:
 		return m, tea.Quit
@@ -140,24 +168,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case screens.PipelineOpenURLMsg:
-		url := msg.URL
-		return m, func() tea.Msg {
-			var cmd *exec.Cmd
-			switch runtime.GOOS {
-			case "darwin":
-				cmd = exec.Command("open", url)
-			case "linux":
-				cmd = exec.Command("xdg-open", url)
-			case "windows":
-				cmd = exec.Command("cmd", "/c", "start", "", url)
-			default:
-				cmd = exec.Command("xdg-open", url)
-			}
-			_ = cmd.Run()
-			return nil
-		}
+		return m, openURLCmd(msg.URL)
 
 	default:
+		if m.state == viewOverview {
+			ov, cmd := m.overview.Update(msg)
+			m.overview = ov
+			return m, cmd
+		}
 		if m.state == viewReport {
 			vm, cmd := m.viewer.Update(msg)
 			m.viewer = vm
@@ -173,20 +191,48 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inbox = ib
 			return m, cmd
 		}
+		if m.state == viewProfile {
+			pf, cmd := m.profile.Update(msg)
+			m.profile = pf
+			return m, cmd
+		}
 		pm, cmd := m.pipeline.Update(msg)
 		m.pipeline = pm
 		return m, cmd
 	}
 }
 
+// openURLCmd returns a tea.Cmd that opens a URL in the browser.
+func openURLCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("open", url)
+		case "linux":
+			cmd = exec.Command("xdg-open", url)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", "", url)
+		default:
+			cmd = exec.Command("xdg-open", url)
+		}
+		_ = cmd.Run()
+		return nil
+	}
+}
+
 func (m appModel) View() string {
 	switch m.state {
+	case viewOverview:
+		return m.overview.View()
 	case viewReport:
 		return m.viewer.View()
 	case viewProgress:
 		return m.progress.View()
 	case viewInbox:
 		return m.inbox.View()
+	case viewProfile:
+		return m.profile.View()
 	default:
 		return m.pipeline.View()
 	}
@@ -198,18 +244,18 @@ func main() {
 
 	careerOpsPath := *pathFlag
 
-	// Load applications
+	// Load applications (allow empty — overview screen handles it)
 	apps := data.ParseApplications(careerOpsPath)
 	if apps == nil {
-		fmt.Fprintf(os.Stderr, "Error: could not find applications.md in %s or %s/data/\n", careerOpsPath, careerOpsPath)
-		os.Exit(1)
+		apps = []model.CareerApplication{}
 	}
 
-	// Compute metrics
+	// Compute everything
 	metrics := data.ComputeMetrics(apps)
 	progressMetrics := data.ComputeProgressMetrics(apps)
+	inboxItems := data.ParsePipelineInbox(careerOpsPath)
+	overviewData := data.ComputeOverview(careerOpsPath, apps, inboxItems)
 
-	// Batch-load all report summaries
 	t := theme.NewTheme("auto")
 	pm := screens.NewPipelineModel(t, apps, metrics, careerOpsPath, 120, 40)
 
@@ -223,11 +269,15 @@ func main() {
 		}
 	}
 
+	overview := screens.NewOverviewModel(t, overviewData, 120, 40)
+
 	m := appModel{
+		overview:        overview,
 		pipeline:        pm,
 		careerOpsPath:   careerOpsPath,
 		theme:           t,
 		progressMetrics: progressMetrics,
+		state:           viewOverview, // start on Overview
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

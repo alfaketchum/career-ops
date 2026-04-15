@@ -30,6 +30,54 @@ type PipelineInboxStats struct {
 	AvgDeep     float64
 }
 
+// ScanStats summarizes the scanner output.
+type ScanStats struct {
+	TotalSeen       int    // total URLs ever scanned
+	Added           int    // added to pipeline
+	SkippedTitle    int
+	SkippedDup      int
+	SkippedExpired  int
+	LastScanDate    string // most recent first_seen date
+	BySource        map[string]int
+}
+
+// LightPassStats summarizes light-pass progress.
+type LightPassStats struct {
+	Done       int
+	Pending    int
+	AvgScore   float64
+	HighScore  float64
+	LastScored string
+}
+
+// DeepPassStats summarizes deep-pass progress.
+type DeepPassStats struct {
+	Done       int
+	Pending    int // light-passed but not deep-passed
+	AvgScore   float64
+	HighScore  float64
+	LastDeepAt string
+}
+
+// TopPriority is a single high-priority URL waiting for deep pass.
+type TopPriority struct {
+	Score   float64
+	Company string
+	Role    string
+	URL     string
+}
+
+// Overview is the top-level dashboard summary across all data sources.
+type Overview struct {
+	Scan          ScanStats
+	InboxPending  int
+	InboxTotal    int
+	Light         LightPassStats
+	Deep          DeepPassStats
+	TopPriorities []TopPriority // top 10 light-passed but not yet deep-passed
+	Tracker       PipelineMetrics
+}
+
 // CareerApplication represents a single job application from the tracker.
 type CareerApplication struct {
 	Number       int
