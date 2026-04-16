@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sample 5: Kanban Pipeline Light</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#f4f4f6;color:#1a1c20;line-height:1.5;font-size:15px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:#fff;border-bottom:1px solid #e4e5e9}
+.topbar .brand{font-size:17px;font-weight:700;letter-spacing:-0.03em}
+.topbar .search{padding:8px 16px;background:#f4f4f6;border:1px solid #e4e5e9;border-radius:10px;font-size:13px;color:#9498a5;width:260px}
+.layout{display:flex;height:calc(100vh - 53px)}
+.sidebar{width:200px;background:#fff;border-right:1px solid #e4e5e9;padding:20px 0;flex-shrink:0}
+.sidebar a{display:flex;align-items:center;gap:10px;padding:9px 20px;font-size:14px;text-decoration:none;color:#6b6f7b;font-weight:500}
+.sidebar a.active{color:#1a1c20;background:#f4f4f6;font-weight:600}
+.sidebar .cnt{margin-left:auto;font-size:11px;background:#e4e5e9;padding:1px 7px;border-radius:8px;color:#6b6f7b;font-weight:600}
+.sidebar .div{border-top:1px solid #e4e5e9;margin:12px 20px}
+.content{flex:1;padding:24px 28px;overflow-y:auto}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.ph h1{font-size:22px;font-weight:700;letter-spacing:-0.03em}
+.bt{padding:10px 22px;background:#0d9488;color:#fff;border-radius:10px;font-weight:600;font-size:13px;border:none}
+.sb{display:flex;gap:24px;margin-bottom:24px;padding:16px 20px;background:#fff;border-radius:12px;border:1px solid #e4e5e9}
+.si{text-align:center}.si .num{font-size:22px;font-weight:700;letter-spacing:-0.02em}.si .la{font-size:11px;color:#6b6f7b;text-transform:uppercase;letter-spacing:0.06em}
+.kanban{display:flex;gap:16px;overflow-x:auto}
+.col{width:280px;flex-shrink:0}
+.ch{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6b6f7b;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ch .dot{width:8px;height:8px;border-radius:50%}.db{background:#3b82f6}.dg{background:#0d9488}.da{background:#d97706}.dr{background:#dc2626}
+.kc{background:#fff;border:1px solid #e4e5e9;border-radius:12px;padding:16px;margin-bottom:10px}
+.kc .co{font-weight:600;font-size:15px;margin-bottom:2px}.kc .ro{font-size:13px;color:#6b6f7b;margin-bottom:10px}
+.kc .ft{display:flex;justify-content:space-between;align-items:center}
+.kc .sc{font-weight:700;font-size:14px;color:#0d9488}.kc .dt{font-size:11px;color:#9498a5}
+.kc .src{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:#f0fdf4;color:#0d9488}
+.info{font-size:12px;color:#b0b3bc;text-align:center;padding:32px}
+</style></head><body>
+<div class="topbar"><div class="brand">career-ops</div><input class="search" placeholder="Search jobs, companies..." readonly></div>
+<div class="layout">
+<nav class="sidebar">
+<a class="active" href="#">Pipeline <span class="cnt">42</span></a>
+<a href="#">Favorites <span class="cnt">8</span></a>
+<a href="#">All Jobs <span class="cnt">247</span></a>
+<div class="div"></div>
+<a href="#">Keywords</a><a href="#">Profile</a><a href="#">Settings</a>
+</nav>
+<div class="content">
+<div class="ph"><h1>Pipeline</h1><button class="bt">Scan for jobs</button></div>
+<div class="sb"><div class="si"><div class="num">12</div><div class="la">New</div></div><div class="si"><div class="num">8</div><div class="la">Selected</div></div><div class="si"><div class="num">18</div><div class="la">Applied</div></div><div class="si"><div class="num">3</div><div class="la">Interview</div></div><div class="si"><div class="num">1</div><div class="la">Offer</div></div></div>
+<div class="kanban">
+<div class="col"><div class="ch"><span class="dot db"></span> New (12)</div>
+<div class="kc"><div class="co">Stripe</div><div class="ro">Senior PM, AI</div><div class="ft"><span class="sc">4.6</span><span class="src">Greenhouse</span></div></div>
+<div class="kc"><div class="co">Notion</div><div class="ro">Head of Applied AI</div><div class="ft"><span class="sc">4.3</span><span class="src">Lever</span></div></div>
+<div class="kc"><div class="co">Figma</div><div class="ro">Product Lead, AI</div><div class="ft"><span class="sc">3.9</span><span class="src">Ashby</span></div></div>
+</div>
+<div class="col"><div class="ch"><span class="dot dg"></span> Applied (18)</div>
+<div class="kc"><div class="co">Vercel</div><div class="ro">Product Manager</div><div class="ft"><span class="sc">4.1</span><span class="dt">Apr 10</span></div></div>
+<div class="kc"><div class="co">Datadog</div><div class="ro">Sr. PM, Platform</div><div class="ft"><span class="sc">4.0</span><span class="dt">Apr 8</span></div></div>
+</div>
+<div class="col"><div class="ch"><span class="dot da"></span> Interview (3)</div>
+<div class="kc"><div class="co">Anthropic</div><div class="ro">Applied AI Lead</div><div class="ft"><span class="sc">4.8</span><span class="dt">Round 2</span></div></div>
+</div>
+<div class="col"><div class="ch"><span class="dot dr"></span> Rejected (6)</div>
+<div class="kc" style="opacity:.6"><div class="co">OpenAI</div><div class="ro">PM, Safety</div><div class="ft"><span class="sc" style="color:#9498a5">3.2</span><span class="dt">Apr 5</span></div></div>
+</div>
+</div></div></div>
+<div class="info">Sample 5: Kanban Pipeline Light &middot; system-ui &middot; #0d9488 teal &middot; Pipeline-as-columns</div>
+</body></html>

@@ -25,6 +25,8 @@ const PORTALS_PATH = 'portals.yml';
 const SCAN_HISTORY_PATH = 'data/scan-history.tsv';
 const PIPELINE_PATH = 'data/pipeline.md';
 const APPLICATIONS_PATH = 'data/applications.md';
+const JOBS_TSV_PATH = 'data/jobs.tsv';
+const JOBS_HEADER = 'url\tcompany\trole\tsource\tscan_date\tliveness\tselected\tcv_status\tcv_date\tnotes';
 
 // Ensure required directories exist (fresh setup)
 mkdirSync('data', { recursive: true });
@@ -122,8 +124,26 @@ async function fetchJson(url) {
 
 // ── Title filter ────────────────────────────────────────────────────
 
+function loadKeywordsPositive() {
+  const kwPath = 'data/keywords.json';
+  if (!existsSync(kwPath)) return [];
+  try {
+    const kw = JSON.parse(readFileSync(kwPath, 'utf-8'));
+    const enabled = [
+      ...(kw.keywords || []).filter(k => k.enabled),
+      ...(kw.user_added || []).filter(k => k.enabled),
+    ];
+    return enabled.map(k => k.term.toLowerCase());
+  } catch {
+    return [];
+  }
+}
+
 function buildTitleFilter(titleFilter) {
-  const positive = (titleFilter?.positive || []).map(k => k.toLowerCase());
+  // Merge portals.yml positive keywords with keywords.json enabled terms
+  const portalPositive = (titleFilter?.positive || []).map(k => k.toLowerCase());
+  const kwPositive = loadKeywordsPositive();
+  const positive = [...new Set([...portalPositive, ...kwPositive])];
   const negative = (titleFilter?.negative || []).map(k => k.toLowerCase());
 
   return (title) => {
@@ -161,6 +181,15 @@ function loadSeenUrls() {
     const text = readFileSync(APPLICATIONS_PATH, 'utf-8');
     for (const match of text.matchAll(/https?:\/\/[^\s|)]+/g)) {
       seen.add(match[0]);
+    }
+  }
+
+  // jobs.tsv — unified state file
+  if (existsSync(JOBS_TSV_PATH)) {
+    const lines = readFileSync(JOBS_TSV_PATH, 'utf-8').split('\n');
+    for (let i = 1; i < lines.length; i++) {
+      const url = lines[i].split('\t')[0];
+      if (url) seen.add(url);
     }
   }
 
@@ -227,6 +256,29 @@ function appendToScanHistory(offers, date) {
   ).join('\n') + '\n';
 
   appendFileSync(SCAN_HISTORY_PATH, lines, 'utf-8');
+}
+
+function appendToJobsTsv(offers, date) {
+  if (!existsSync(JOBS_TSV_PATH)) {
+    writeFileSync(JOBS_TSV_PATH, JOBS_HEADER + '\n', 'utf-8');
+  }
+
+  // Load existing URLs for dedup
+  const existing = new Set();
+  const lines = readFileSync(JOBS_TSV_PATH, 'utf-8').split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const url = lines[i].split('\t')[0];
+    if (url) existing.add(url);
+  }
+
+  const newLines = offers
+    .filter(o => !existing.has(o.url))
+    .map(o => [o.url, o.company, o.title, o.source, date, 'unchecked', '', '', '', ''].join('\t'))
+    .join('\n');
+
+  if (newLines) {
+    appendFileSync(JOBS_TSV_PATH, newLines + '\n', 'utf-8');
+  }
 }
 
 // ── Parallel fetch with concurrency limit ───────────────────────────
@@ -326,6 +378,7 @@ async function main() {
   if (!dryRun && newOffers.length > 0) {
     appendToPipeline(newOffers);
     appendToScanHistory(newOffers, date);
+    appendToJobsTsv(newOffers, date);
   }
 
   // 6. Print summary
@@ -377,8 +430,8 @@ async function main() {
     }
   }
 
-  console.log(`\n→ Run /career-ops pipeline to evaluate new offers.`);
-  console.log('→ Share results and get help: https://discord.gg/8pRpHETxa4');
+  console.log(`\n→ Review new jobs in the dashboard: npm run web`);
+  console.log('→ Select jobs and generate CVs: bash batch/batch-cv.sh');
 }
 
 main().catch(err => {

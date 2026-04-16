@@ -3,35 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>career-ops dashboard</title>
+  <title>career-ops</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <span class="logo">⚡</span>
-      <span class="title">career-ops</span>
-      <span class="tagline">Always Be Applying</span>
-    </div>
-    <nav id="tabs">
-      <a href="#/overview" data-tab="overview">Overview</a>
-      <a href="#/inbox" data-tab="inbox">Inbox</a>
-      <a href="#/tracker" data-tab="tracker">Tracker</a>
-      <a href="#/progress" data-tab="progress">Progress</a>
-      <a href="#/profile" data-tab="profile">Profile</a>
-    </nav>
-    <div class="status">
-      <span id="connection-status" class="dot"></span>
-      <span id="last-updated">—</span>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-top">
+        <div class="brand">
+          <div class="logomark">&#9889;</div>
+          <span class="title">career-ops</span>
+          <span class="tagline">Always Be Applying</span>
+        </div>
+        <div class="status">
+          <span id="connection-status" class="dot"></span>
+          <span id="last-updated">&mdash;</span>
+        </div>
+      </div>
+      <div class="hero-stats" id="hero-stats">
+        <div class="hero-stat">
+          <span class="hero-stat-value">&mdash;</span>
+          <span class="hero-stat-label">Total Jobs</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-value">&mdash;</span>
+          <span class="hero-stat-label">Applied</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-value">&mdash;</span>
+          <span class="hero-stat-label">Interviews</span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-value">&mdash;</span>
+          <span class="hero-stat-label">Avg Score</span>
+        </div>
+      </div>
+      <nav id="tabs" class="pill-nav">
+        <a href="#/overview" data-tab="overview">Overview</a>
+        <a href="#/jobs" data-tab="jobs">Jobs</a>
+        <a href="#/keywords" data-tab="keywords">Keywords</a>
+        <a href="#/tracker" data-tab="tracker">Tracker</a>
+        <a href="#/progress" data-tab="progress">Progress</a>
+        <a href="#/profile" data-tab="profile">Profile</a>
+        <a href="#/settings" data-tab="settings">Settings</a>
+      </nav>
     </div>
   </header>
 
+  <div class="next-step" id="next-step"></div>
+
   <main id="content">
-    <div class="loading">Loading…</div>
+    <div class="loading">Loading&hellip;</div>
   </main>
 
   <footer>
-    <span>career-ops · read-only · refresh: <kbd>R</kbd></span>
+    <span>career-ops &middot; read-only &middot; refresh: <kbd>R</kbd></span>
   </footer>
 
   <script src="/static/app.js"></script>

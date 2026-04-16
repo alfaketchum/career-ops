@@ -1,3 +1,7 @@
+# Secrets
+.env
+.env.local
+
 # Personal data (user fills these)
 data/applications.md
 data/pipeline.md

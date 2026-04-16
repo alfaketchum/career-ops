@@ -6,7 +6,6 @@
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { readHistory } from '../pass-history.mjs';
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -119,7 +118,53 @@ export function parseApplications(careerOpsPath) {
   return apps;
 }
 
-// ── pipeline.md (joined with pass-history) ──────────────────────
+// ── jobs.tsv (unified state) ────────────────────────────────────
+
+export function parseJobs(careerOpsPath) {
+  const p = join(careerOpsPath, 'data', 'jobs.tsv');
+  if (!existsSync(p)) return [];
+
+  const content = readFileSync(p, 'utf8');
+  const items = [];
+  const lines = content.split('\n');
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const f = line.split('\t');
+    if (f.length < 10) continue;
+    const [url, company, role, source, scanDate, liveness, selected, cvStatus, cvDate, notes] = f;
+    items.push({
+      url: url || '',
+      company: company || '',
+      role: role || '',
+      source: source || detectSource(url),
+      scanDate: scanDate || '',
+      liveness: liveness || 'unchecked',
+      selected: selected === 'yes',
+      cvStatus: cvStatus || '',
+      cvDate: cvDate || '',
+      notes: notes || '',
+    });
+  }
+  return items;
+}
+
+export function computeJobStats(jobs) {
+  return {
+    total: jobs.length,
+    active: jobs.filter(j => j.liveness === 'active').length,
+    expired: jobs.filter(j => j.liveness === 'expired').length,
+    uncertain: jobs.filter(j => j.liveness === 'uncertain').length,
+    unchecked: jobs.filter(j => j.liveness === 'unchecked').length,
+    selected: jobs.filter(j => j.selected).length,
+    cvDone: jobs.filter(j => j.cvStatus === 'done').length,
+    cvPending: jobs.filter(j => j.cvStatus === 'pending' || j.cvStatus === 'generating').length,
+    cvFailed: jobs.filter(j => j.cvStatus === 'failed').length,
+  };
+}
+
+// ── pipeline.md (legacy, kept for backward compat) ──────────────
 
 export function parsePipelineInbox(careerOpsPath) {
   const r = readFirst([
@@ -127,11 +172,6 @@ export function parsePipelineInbox(careerOpsPath) {
     join(careerOpsPath, 'pipeline.md'),
   ]);
   if (!r) return [];
-
-  // Read pass-history (pass-history.mjs uses cwd-relative path; ensure we cd-equivalent)
-  // The function readHistory uses HISTORY_PATH = 'data/pass-history.tsv' relative to CWD.
-  // For correctness when careerOpsPath != cwd, parse manually here too.
-  const history = loadPassHistoryDirect(careerOpsPath);
 
   const items = [];
   let num = 0;
@@ -143,61 +183,16 @@ export function parsePipelineInbox(careerOpsPath) {
     const m = re.exec(line);
     if (!m) continue;
     num++;
-    const url = m[2].trim();
-    const item = {
+    items.push({
       number: num,
-      url,
+      url: m[2].trim(),
       company: m[3].trim(),
       role: m[4].trim(),
-      source: detectSource(url),
+      source: detectSource(m[2].trim()),
       processed: m[1] === 'x',
-      lightScore: 0,
-      lightAt: '',
-      deepReport: '',
-      deepScore: 0,
-      deepAt: '',
-    };
-    const h = history.get(url);
-    if (h) {
-      if (h.company) item.company = h.company;
-      if (h.role) item.role = h.role;
-      item.lightScore = h.lightScore || 0;
-      item.lightAt = h.lightAt || '';
-      item.deepReport = h.deepReport || '';
-      item.deepScore = h.deepScore || 0;
-      item.deepAt = h.deepAt || '';
-    }
-    items.push(item);
-  }
-  return items;
-}
-
-function loadPassHistoryDirect(careerOpsPath) {
-  const r = readFirst([
-    join(careerOpsPath, 'data', 'pass-history.tsv'),
-    join(careerOpsPath, 'pass-history.tsv'),
-  ]);
-  const map = new Map();
-  if (!r) return map;
-  const lines = r.content.split('\n');
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const f = line.split('\t');
-    if (f.length < 8) continue;
-    const [url, company, role, ls, la, dr, ds, da] = f;
-    map.set(url, {
-      url,
-      company: company || '',
-      role: role || '',
-      lightScore: ls === '-' || !ls ? null : parseFloat(ls),
-      lightAt: la === '-' || !la ? null : la,
-      deepReport: dr === '-' || !dr ? null : dr,
-      deepScore: ds === '-' || !ds ? null : parseFloat(ds),
-      deepAt: da === '-' || !da ? null : da,
     });
   }
-  return map;
+  return items;
 }
 
 // ── scan-history.tsv ────────────────────────────────────────────
@@ -359,79 +354,34 @@ function isoWeek(dateStr) {
 }
 
 export function computeInboxStats(items) {
-  const s = { total: items.length, untouched: 0, lightOnly: 0, deepDone: 0, avgLight: 0, avgDeep: 0 };
-  let lightSum = 0, lightCount = 0, deepSum = 0, deepCount = 0;
-  for (const it of items) {
-    const hasLight = it.lightScore > 0;
-    const hasDeep = !!it.deepReport;
-    if (hasDeep) {
-      s.deepDone++;
-      deepSum += it.deepScore;
-      deepCount++;
-    } else if (hasLight) {
-      s.lightOnly++;
-      lightSum += it.lightScore;
-      lightCount++;
-    } else {
-      s.untouched++;
-    }
-    if (hasLight && hasDeep) {
-      lightSum += it.lightScore;
-      lightCount++;
-    }
+  return { total: items.length, pending: items.filter(it => !it.processed).length };
+}
+
+function loadDeadSet(careerOpsPath) {
+  const p = join(careerOpsPath, 'data', 'dead-urls.tsv');
+  if (!existsSync(p)) return new Set();
+  const set = new Set();
+  const lines = readFileSync(p, 'utf8').split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    const [url] = lines[i].split('\t');
+    if (url) set.add(url);
   }
-  if (lightCount) s.avgLight = lightSum / lightCount;
-  if (deepCount) s.avgDeep = deepSum / deepCount;
-  return s;
+  return set;
 }
 
 export function computeOverview(careerOpsPath) {
   const apps = parseApplications(careerOpsPath);
-  const items = parsePipelineInbox(careerOpsPath);
+  const jobs = parseJobs(careerOpsPath);
   const scan = loadScanStats(careerOpsPath);
   const tracker = computeMetrics(apps);
+  const jobStats = computeJobStats(jobs);
 
-  const overview = {
+  return {
     scan,
-    inboxTotal: items.length,
-    inboxPending: items.filter(it => !it.processed).length,
-    light: { done: 0, pending: 0, avgScore: 0, highScore: 0, lastScored: '' },
-    deep: { done: 0, pending: 0, avgScore: 0, highScore: 0, lastDeepAt: '' },
-    topPriorities: [],
+    jobs: jobStats,
     tracker,
+    lastScanDate: scan.lastScanDate || '',
   };
-
-  let lightSum = 0, deepSum = 0;
-  const pending = [];
-  let lastLight = '', lastDeep = '';
-
-  for (const it of items) {
-    if (it.lightScore > 0) {
-      overview.light.done++;
-      lightSum += it.lightScore;
-      if (it.lightScore > overview.light.highScore) overview.light.highScore = it.lightScore;
-      if (it.lightAt > lastLight) lastLight = it.lightAt;
-      if (!it.deepReport) {
-        pending.push({ score: it.lightScore, company: it.company, role: it.role, url: it.url });
-      }
-    }
-    if (it.deepReport) {
-      overview.deep.done++;
-      deepSum += it.deepScore;
-      if (it.deepScore > overview.deep.highScore) overview.deep.highScore = it.deepScore;
-      if (it.deepAt > lastDeep) lastDeep = it.deepAt;
-    }
-  }
-  if (overview.light.done) overview.light.avgScore = lightSum / overview.light.done;
-  if (overview.deep.done) overview.deep.avgScore = deepSum / overview.deep.done;
-  overview.light.lastScored = lastLight;
-  overview.deep.lastDeepAt = lastDeep;
-  overview.light.pending = Math.max(0, overview.inboxPending - overview.light.done);
-  overview.deep.pending = pending.length;
-
-  pending.sort((a, b) => b.score - a.score);
-  overview.topPriorities = pending.slice(0, 10);
-  return overview;
 }
 
 // ── profile files (whitelist) ───────────────────────────────────

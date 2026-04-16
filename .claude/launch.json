@@ -4,7 +4,7 @@
     {
       "name": "web-dashboard",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["web/server.mjs"],
+      "runtimeArgs": ["--env-file-if-exists=.env", "web/server.mjs"],
       "port": 3000
     }
   ]

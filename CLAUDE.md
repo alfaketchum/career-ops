@@ -65,10 +65,13 @@ AI-powered job search automation built on Claude Code: pipeline tracking, offer 
 | `cache-company.mjs` | Auto-cache companies to portals.yml after high-score evaluations |
 | `linkedin-scan.mjs` | OPT-IN authenticated LinkedIn job search (`node scan.mjs --linkedin-auth`). Requires `node auth-setup.mjs` first. Account-ban risk — use sparingly. |
 | `auth-setup.mjs` | One-time browser login capture for LinkedIn/Glassdoor (only needed if using --linkedin-auth) |
-| `fetch-jd.mjs` | Auth-aware JD fetcher used by deep pass when WebFetch fails. Uses `liveness-core.mjs` for staleness classification. |
-| `pass-history.mjs` | URL-keyed persistent state tracker (light pass + deep pass dedup) |
-| `web/server.mjs` | Browser dashboard server (read-only). Run: `npm run web` → http://localhost:3000 |
-| `data/pass-history.tsv` | Single source of truth for what URLs have been light/deep passed |
+| `fetch-jd.mjs` | Auth-aware JD fetcher used by batch CV workers when WebFetch fails. Uses `liveness-core.mjs` for staleness classification. |
+| `generate-keywords.mjs` | Auto-generate search keywords from cv.md + profile.yml + article-digest.md → data/keywords.json |
+| `data/jobs.tsv` | Unified job state file (url, company, role, source, liveness, selected, cv_status). Single source of truth. |
+| `data/keywords.json` | Search keywords with toggle state, source tracking, change detection. Managed via dashboard. |
+| `batch/batch-cv.sh` | Batch CV generator — reads selected jobs from jobs.tsv, spawns claude -p workers for A-G eval + PDF |
+| `web/server.mjs` | Browser dashboard server. Run: `npm run web` → http://localhost:3000 |
+| `archive/` | Archived deprecated files (light pass, deep pass, pass-history) — kept for reference |
 | `check-liveness.mjs` | Job posting liveness checker |
 | `liveness-core.mjs` | Shared liveness logic (expired signals win over generic Apply text) |
 | `reports/` | Evaluation reports (format: `{###}-{company-slug}-{YYYY-MM-DD}.md`). Blocks A-F + G (Posting Legitimacy). Header includes `**Legitimacy:** {tier}`. |
@@ -345,3 +348,12 @@ Write one TSV file per evaluation to `batch/tracker-additions/{num}-{company-slu
 - No markdown bold (`**`) in status field
 - No dates in status field (use the date column)
 - No extra text (use the notes column)
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `python3 -c "from graphify.watch import _rebuild_code; from pathlib import Path; _rebuild_code(Path('.'))"` to keep the graph current

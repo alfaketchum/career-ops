@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refined 5: Full Voltage</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: #f0f4ff; color: #0a1029; line-height: 1.5; font-size: 15px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 32px; background: #fff; border-bottom: 1px solid #d0daef; }
+.topbar .brand { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; color: #0a1029; display: flex; align-items: center; gap: 8px; }
+.topbar .brand .mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #0055ff; border-radius: 7px; color: #fff; font-size: 14px; font-weight: 700; }
+.topbar nav { display: flex; gap: 4px; }
+.topbar nav a { padding: 8px 14px; border-radius: 8px; text-decoration: none; color: #4a5580; font-size: 14px; font-weight: 500; transition: background 0.15s ease, color 0.15s ease; }
+.topbar nav a:hover { background: #e4ecff; color: #0055ff; }
+.topbar nav a.active { background: #0055ff; color: #fff; font-weight: 600; }
+
+.container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+
+.hero-banner { background: #0055ff; border-radius: 16px; padding: 32px; margin-bottom: 24px; color: #fff; position: relative; overflow: hidden; }
+.hero-banner::before { content: ''; position: absolute; top: -40px; right: -40px; width: 180px; height: 180px; background: rgba(255,255,255,0.06); border-radius: 50%; }
+.hero-banner::after { content: ''; position: absolute; bottom: -60px; right: 80px; width: 120px; height: 120px; background: rgba(255,255,255,0.04); border-radius: 50%; }
+.hero-banner h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 6px; position: relative; z-index: 1; }
+.hero-banner p { color: rgba(255,255,255,0.8); position: relative; z-index: 1; }
+.hero-banner p strong { color: #fff; }
+.hero-banner .hero-stats { display: flex; gap: 32px; margin-top: 20px; position: relative; z-index: 1; }
+.hero-banner .hero-stat .num { font-size: 26px; font-weight: 700; }
+.hero-banner .hero-stat .desc { font-size: 12px; color: rgba(255,255,255,0.65); }
+
+.next-step { background: #fff; border-radius: 14px; padding: 24px; margin-bottom: 20px; border: 1px solid #d0daef; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.next-step-content { flex: 1; }
+.next-step .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #0055ff; font-weight: 700; margin-bottom: 8px; }
+.next-step h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px; color: #0a1029; }
+.next-step p { color: #4a5580; font-size: 14px; }
+.btn { display: inline-block; padding: 12px 28px; background: #0055ff; color: #fff; border-radius: 10px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; white-space: nowrap; transition: background 0.15s ease, box-shadow 0.15s ease; }
+.btn:hover { background: #0044d4; box-shadow: 0 4px 20px rgba(0, 85, 255, 0.35); }
+
+.recent { background: #fff; border-radius: 14px; padding: 28px; border: 1px solid #d0daef; }
+.recent h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: #0a1029; }
+.recent-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #eaeff8; }
+.recent-item:last-child { border-bottom: none; }
+.recent-item .company { font-weight: 600; color: #0a1029; }
+.recent-item .role { color: #4a5580; font-size: 14px; }
+.recent-item .score { font-weight: 700; color: #0055ff; font-size: 16px; }
+.tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #dbe6ff; color: #0055ff; }
+.tag.green { background: #dcf5e4; color: #15803d; }
+.tag.gray { background: #e8ecf4; color: #4a5580; }
+
+.info { font-size: 12px; color: #9ca0ab; text-align: center; padding: 32px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><span class="mark">C</span> career-ops</div>
+  <nav><a class="active" href="#">Overview</a><a href="#">Jobs</a><a href="#">Tracker</a><a href="#">Keywords</a><a href="#">Profile</a></nav>
+</div>
+<div class="container">
+  <div class="hero-banner">
+    <h1>Good morning</h1>
+    <p><strong>3 new jobs</strong> matched your criteria since yesterday</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">247</div><div class="desc">Jobs scanned</div></div>
+      <div class="hero-stat"><div class="num">18</div><div class="desc">Applications</div></div>
+      <div class="hero-stat"><div class="num">4.2</div><div class="desc">Avg score</div></div>
+    </div>
+  </div>
+  <div class="next-step">
+    <div class="next-step-content">
+      <div class="label">Next step</div>
+      <h2>Review 12 unscreened jobs</h2>
+      <p>New jobs from your latest scan, ready for evaluation.</p>
+    </div>
+    <button class="btn">Start reviewing</button>
+  </div>
+  <div class="recent"><h3>Recent evaluations</h3>
+    <div class="recent-item"><div><div class="company">Stripe</div><div class="role">Senior Product Manager</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag green">Applied</span><span class="score">4.6</span></div></div>
+    <div class="recent-item"><div><div class="company">Notion</div><div class="role">Head of AI Products</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag">Evaluated</span><span class="score">4.3</span></div></div>
+    <div class="recent-item"><div><div class="company">Linear</div><div class="role">Engineering Manager</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag gray">Skipped</span><span class="score">2.8</span></div></div>
+  </div>
+</div>
+<div class="info">Refined 5: Full Voltage -- Blue hero banner with stats, compact next-step row, #0055ff saturated electric, blue logomark, maximum blue presence</div>
+</body></html>

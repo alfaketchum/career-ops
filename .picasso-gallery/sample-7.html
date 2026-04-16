@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sample 7: Linear Dense Dark</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#0e0f11;color:#d4d5d9;line-height:1.5;font-size:14px}
+.shell{display:flex;height:100vh}
+.sidebar{width:220px;background:#0e0f11;border-right:1px solid #1c1d21;padding:16px 0;flex-shrink:0;display:flex;flex-direction:column}
+.sidebar .brand{padding:0 16px 16px;font-size:14px;font-weight:700;letter-spacing:-0.02em;color:#f0f0f2;display:flex;align-items:center;gap:8px}
+.sidebar .brand .icon{width:22px;height:22px;background:#5e5ce6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:800}
+.sidebar a{display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:13px;text-decoration:none;color:#6e7079;font-weight:500}
+.sidebar a:hover{color:#d4d5d9}.sidebar a.active{color:#f0f0f2;background:#17181c}
+.sidebar .sl{font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#3d3f47;padding:16px 16px 6px;font-weight:700}
+.sidebar .sp{flex:1}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #1c1d21;flex-shrink:0}
+.toolbar h1{font-size:15px;font-weight:600;color:#f0f0f2}
+.toolbar .right{display:flex;gap:8px;align-items:center}
+.fb{padding:5px 12px;background:#17181c;border:1px solid #1c1d21;border-radius:6px;font-size:12px;color:#6e7079;cursor:pointer;font-family:inherit}
+.fb.active{color:#d4d5d9;border-color:#2c2d33}
+.cb{padding:5px 12px;background:#5e5ce6;color:#fff;border-radius:6px;font-size:12px;font-weight:600;border:none}
+.list{flex:1;overflow-y:auto}
+.lh{display:grid;grid-template-columns:32px 1fr 100px 90px 80px 80px;gap:8px;padding:8px 20px;font-size:11px;color:#3d3f47;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;border-bottom:1px solid #1c1d21;position:sticky;top:0;background:#0e0f11}
+.lr{display:grid;grid-template-columns:32px 1fr 100px 90px 80px 80px;gap:8px;padding:9px 20px;border-bottom:1px solid #141518;align-items:center}
+.lr:hover{background:#141518}
+.ck{width:16px;height:16px;border-radius:4px;border:1.5px solid #2c2d33;background:transparent;cursor:pointer;appearance:none}
+.ck:checked{background:#5e5ce6;border-color:#5e5ce6}
+.ji .co{font-weight:600;color:#f0f0f2;font-size:13px}.ji .ro{color:#6e7079;font-size:12px}
+.st{font-size:11px;padding:2px 8px;border-radius:4px;background:#17181c;color:#6e7079;font-weight:500}
+.lv{font-size:12px;font-weight:600}.lv.ac{color:#22c55e}.lv.ex{color:#ef4444}.lv.un{color:#3d3f47}
+.scc{font-weight:700;font-size:13px}.scc.hi{color:#22c55e}.scc.mi{color:#eab308}.scc.lo{color:#6e7079}
+.dc{font-size:12px;color:#3d3f47}
+.sb{display:flex;align-items:center;gap:16px;padding:10px 20px;border-top:1px solid #1c1d21;font-size:12px;color:#3d3f47;flex-shrink:0}
+.sb .cnt{color:#6e7079}
+.info{font-size:12px;color:#2a2b2f;text-align:center;padding:24px;background:#0e0f11}
+</style></head><body>
+<div class="shell">
+<nav class="sidebar">
+<div class="brand"><span class="icon">C</span> career-ops</div>
+<div class="sl">Navigate</div>
+<a class="active" href="#">Overview</a><a href="#">Jobs</a><a href="#">Pipeline</a>
+<div class="sl">Manage</div>
+<a href="#">Keywords</a><a href="#">Profile</a><a href="#">Reports</a>
+<div class="sp"></div>
+</nav>
+<div class="main">
+<div class="toolbar"><h1>Jobs</h1><div class="right"><button class="fb active">Active</button><button class="fb">Selected</button><button class="fb">All</button><button class="cb">Scan now</button></div></div>
+<div class="list">
+<div class="lh"><span></span><span>Job</span><span>Source</span><span>Status</span><span>Score</span><span>Date</span></div>
+<div class="lr"><input type="checkbox" class="ck" checked><div class="ji"><div class="co">Stripe</div><div class="ro">Senior Product Manager, AI</div></div><span class="st">greenhouse</span><span class="lv ac">Active</span><span class="scc hi">4.6</span><span class="dc">Apr 14</span></div>
+<div class="lr"><input type="checkbox" class="ck" checked><div class="ji"><div class="co">Notion</div><div class="ro">Head of Applied AI</div></div><span class="st">lever</span><span class="lv ac">Active</span><span class="scc hi">4.3</span><span class="dc">Apr 13</span></div>
+<div class="lr"><input type="checkbox" class="ck"><div class="ji"><div class="co">Figma</div><div class="ro">Product Lead, AI Features</div></div><span class="st">ashby</span><span class="lv ac">Active</span><span class="scc mi">3.9</span><span class="dc">Apr 13</span></div>
+<div class="lr"><input type="checkbox" class="ck"><div class="ji"><div class="co">Vercel</div><div class="ro">Product Manager</div></div><span class="st">greenhouse</span><span class="lv ac">Active</span><span class="scc mi">3.7</span><span class="dc">Apr 12</span></div>
+<div class="lr"><input type="checkbox" class="ck"><div class="ji"><div class="co">Datadog</div><div class="ro">Sr. PM, Platform</div></div><span class="st">lever</span><span class="lv un">?</span><span class="scc mi">3.5</span><span class="dc">Apr 11</span></div>
+<div class="lr"><input type="checkbox" class="ck"><div class="ji"><div class="co">Anthropic</div><div class="ro">Applied AI Lead</div></div><span class="st">ashby</span><span class="lv ac">Active</span><span class="scc hi">4.8</span><span class="dc">Apr 10</span></div>
+<div class="lr"><input type="checkbox" class="ck"><div class="ji"><div class="co">OpenAI</div><div class="ro">PM, Safety</div></div><span class="st">greenhouse</span><span class="lv ex">Expired</span><span class="scc lo">3.2</span><span class="dc">Apr 8</span></div>
+</div>
+<div class="sb"><span class="cnt">247 jobs</span><span>38 active</span><span>8 selected</span><span style="margin-left:auto">Last scan: 2h ago</span></div>
+</div></div>
+<div class="info">Sample 7: Linear Dense Dark &middot; #5e5ce6 &middot; Compact list, sidebar, keyboard-first</div>
+</body></html>

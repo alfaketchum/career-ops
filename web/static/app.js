@@ -1,15 +1,91 @@
 // career-ops dashboard frontend — vanilla JS, hash routing, polling refresh.
 
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
+
+function formatDeepEvent(ev) {
+  if (!ev) return '';
+  const palette = { marker: 'var(--yellow)', system: 'var(--muted)', tool: 'var(--blue)', say: 'var(--text)', result: 'var(--subtext)', done: 'var(--green)', raw: 'var(--muted)' };
+  const color = palette[ev.kind] || 'var(--text)';
+  if (ev.kind === 'tool') {
+    return `<div style="color: ${color};">◆ <strong>${escapeHTML(ev.tool)}</strong> <span style="color: var(--subtext);">${escapeHTML(ev.detail)}</span></div>`;
+  }
+  if (ev.kind === 'say') {
+    return `<div style="color: ${color}; padding-left: 14px;">${escapeHTML(ev.text)}</div>`;
+  }
+  if (ev.kind === 'result') {
+    return `<div style="color: ${color}; padding-left: 14px; font-style: italic;">↳ ${escapeHTML(ev.text)}</div>`;
+  }
+  if (ev.kind === 'done') {
+    return `<div style="color: ${color}; font-weight: 600;">✓ ${escapeHTML(ev.text)}</div>`;
+  }
+  if (ev.kind === 'marker') {
+    return `<div style="color: ${color}; font-weight: 600; margin-top: 6px;">${escapeHTML(ev.text)}</div>`;
+  }
+  return `<div style="color: ${color};">${escapeHTML(ev.text || '')}</div>`;
+}
 const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
 
-const tabs = ['overview', 'inbox', 'tracker', 'progress', 'profile'];
+const tabs = ['overview', 'jobs', 'keywords', 'tracker', 'progress', 'profile', 'settings'];
 const renderers = {};
 let currentTab = 'overview';
 let pollTimer = null;
-let inboxFilter = 'all';
+let jobsFilter = 'all';
 let trackerFilter = 'all';
 let profileFile = 'profile';
+
+// ── Hero stats & next step bar ──────────────────────────────────
+
+async function updateHero() {
+  try {
+    const ov = await fetchJSON('/api/overview');
+    const jobs = ov.jobs || {};
+    const tracker = ov.tracker || {};
+
+    const statsEl = $('#hero-stats');
+    if (statsEl) {
+      statsEl.innerHTML = [
+        { value: jobs.total || 0, label: 'Total Jobs' },
+        { value: tracker.byStatus?.applied || 0, label: 'Applied' },
+        { value: (tracker.byStatus?.interview || 0) + (tracker.byStatus?.offer || 0), label: 'Interviews' },
+        { value: tracker.avgScore ? tracker.avgScore.toFixed(1) : '\u2014', label: 'Avg Score' },
+      ].map(s => `
+        <div class="hero-stat">
+          <span class="hero-stat-value">${s.value}</span>
+          <span class="hero-stat-label">${s.label}</span>
+        </div>
+      `).join('');
+    }
+
+    const nextEl = $('#next-step');
+    if (nextEl) {
+      let msg, href;
+      if (jobs.total === 0) {
+        msg = 'Run your first scan to find job opportunities';
+        href = '#/overview';
+      } else if (jobs.unchecked > 0) {
+        msg = `Check liveness for ${jobs.unchecked} unchecked jobs`;
+        href = '#/overview';
+      } else if (jobs.active > 0 && jobs.selected === 0) {
+        msg = `Review ${jobs.active} active jobs and select the best matches`;
+        href = '#/jobs';
+      } else if (jobs.selected > 0 && jobs.cvDone < jobs.selected) {
+        msg = `Generate CVs for ${jobs.selected - jobs.cvDone} selected jobs`;
+        href = '#/overview';
+      } else {
+        msg = 'Run a scan to find new opportunities';
+        href = '#/overview';
+      }
+      nextEl.innerHTML = `
+        <div class="next-step-inner">
+          <span class="next-step-text">Next: ${msg}</span>
+          <a href="${href}" class="next-step-go">Go \u2192</a>
+        </div>
+      `;
+    }
+  } catch (e) {
+    // Hero update is non-critical — don't block tab render
+  }
+}
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -62,19 +138,23 @@ function bar(value, max, cls) {
 // ── Overview ───────────────────────────────────────────────────
 
 renderers.overview = async function () {
-  const [ov, scanner, scanProg] = await Promise.all([
+  const [ov, scanner, cvProg, scanStatus, livenessStatus] = await Promise.all([
     fetchJSON('/api/overview'),
     fetchJSON('/api/scanner-status'),
-    fetchJSON('/api/scan-progress'),
+    fetchJSON('/api/cv-progress'),
+    fetchJSON('/api/scan-now-status').catch(() => ({ running: false, log: '' })),
+    fetchJSON('/api/liveness-status').catch(() => ({ running: false })),
   ]);
-  const max = ov.scan.totalSeen || 1;
+
+  const jobs = ov.jobs || {};
+  const max = Math.max(jobs.total || 1, ov.scan?.added || 1);
 
   const funnel = [
-    { label: 'Scanner',   val: ov.scan.totalSeen, cls: 'scanner' },
-    { label: 'Inbox',     val: ov.inboxPending,   cls: 'inbox' },
-    { label: 'Light pass', val: ov.light.done,    cls: 'light' },
-    { label: 'Deep pass',  val: ov.deep.done,     cls: 'deep' },
-    { label: 'Applied',   val: ov.tracker.byStatus.applied || 0, cls: 'applied' },
+    { label: 'Scanned',    val: jobs.total,    cls: 'scanner' },
+    { label: 'Active',     val: jobs.active,   cls: 'inbox' },
+    { label: 'Selected',   val: jobs.selected, cls: 'light' },
+    { label: 'CV done',    val: jobs.cvDone,   cls: 'applied' },
+    { label: 'Applied',    val: ov.tracker?.byStatus?.applied || 0, cls: 'deep' },
   ];
 
   const funnelHTML = funnel.map(f =>
@@ -85,37 +165,6 @@ renderers.overview = async function () {
      </div>`
   ).join('');
 
-  const scanLines = [
-    ['Total seen', ov.scan.totalSeen, ''],
-    ['Added to inbox', ov.scan.added, 'good'],
-    ['Filtered by title', ov.scan.skippedTitle, 'muted'],
-    ['Duplicates', ov.scan.skippedDup, 'muted'],
-    ['Expired', ov.scan.skippedExpired, 'muted'],
-    ['Last scan', ov.scan.lastScanDate || '—', ''],
-  ];
-
-  const lightLines = [
-    ['Completed', `${ov.light.done} of ${ov.inboxTotal}`, ''],
-    ['Avg score', ov.light.avgScore ? ov.light.avgScore.toFixed(2) : '—', 'good'],
-    ['Top score', ov.light.highScore ? ov.light.highScore.toFixed(2) : '—', 'good'],
-    ['Last scored', ov.light.lastScored || '—', ''],
-  ];
-
-  const deepLines = [
-    ['Completed', ov.deep.done, ''],
-    ['Pending light-passed', ov.deep.pending, 'warn'],
-    ['Avg score', ov.deep.avgScore ? ov.deep.avgScore.toFixed(2) : '—', 'good'],
-    ['Top score', ov.deep.highScore ? ov.deep.highScore.toFixed(2) : '—', 'good'],
-    ['Last deep', ov.deep.lastDeepAt || '—', ''],
-  ];
-
-  const trackerLines = [
-    ['Total apps', ov.tracker.total, ''],
-    ['Avg score', ov.tracker.avgScore ? ov.tracker.avgScore.toFixed(2) : '—', 'good'],
-    ['Top score', ov.tracker.topScore ? ov.tracker.topScore.toFixed(2) : '—', 'good'],
-    ['With PDF', ov.tracker.withPDF, ''],
-  ];
-
   const statListHTML = (lines) =>
     `<div class="stat-list">
        ${lines.map(([k, v, cls]) =>
@@ -123,161 +172,102 @@ renderers.overview = async function () {
        ).join('')}
      </div>`;
 
-  const prioritiesHTML = ov.topPriorities.length === 0
-    ? `<div class="empty-state"><p>No light-passed URLs yet. Run:</p><code>bash batch/batch-runner.sh --screen --parallel 5</code></div>`
-    : `<div class="priorities">
-         ${ov.topPriorities.map(p =>
-           `<div class="p-row">
-              <span class="score ${scoreCls(p.score)}">${p.score.toFixed(1)}</span>
-              <span class="p-label">${escapeHTML(p.company)} — ${escapeHTML(p.role)}</span>
-              <a href="${escapeHTML(p.url)}" target="_blank" rel="noopener" class="p-link">open ↗</a>
-            </div>`
-         ).join('')}
-       </div>`;
+  const scanLines = [
+    ['Total scanned', jobs.total, ''],
+    ['Active', jobs.active, 'good'],
+    ['Expired', jobs.expired, 'muted'],
+    ['Uncertain', jobs.uncertain, 'warn'],
+    ['Unchecked', jobs.unchecked, jobs.unchecked > 0 ? 'warn' : ''],
+    ['Last scan', ov.lastScanDate || '—', ''],
+  ];
 
-  const statusBreakdownHTML = Object.entries(ov.tracker.byStatus)
-    .map(([k, v]) => `<span class="status-tag ${k}">${k}: ${v}</span>`)
-    .join(' ');
+  const cvLines = [
+    ['Selected for CV', jobs.selected, ''],
+    ['CV generated', jobs.cvDone, 'good'],
+    ['Generating', cvProg.cvPending || 0, 'warn'],
+    ['Failed', cvProg.cvFailed || 0, cvProg.cvFailed ? 'bad' : 'muted'],
+  ];
 
-  // ── Scanner Modes card (auth status + button) ──
-  const authBadge = scanner.authEnabled
-    ? `<span class="badge good">✓ enabled</span>`
-    : `<span class="badge muted">not configured</span>`;
-  const authRunningBadge = scanner.authSetupRunning
-    ? `<span class="badge warn">browser open — log in then close</span>`
+  const trackerLines = [
+    ['Total apps', ov.tracker?.total || 0, ''],
+    ['Avg score', ov.tracker?.avgScore ? ov.tracker.avgScore.toFixed(2) : '—', 'good'],
+    ['Top score', ov.tracker?.topScore ? ov.tracker.topScore.toFixed(2) : '—', 'good'],
+    ['With PDF', ov.tracker?.withPDF || 0, ''],
+  ];
+
+  const statusBreakdownHTML = ov.tracker?.byStatus
+    ? Object.entries(ov.tracker.byStatus).map(([k, v]) => `<span class="status-tag ${k}">${k}: ${v}</span>`).join(' ')
     : '';
+
+  // Scanner modes card
+  const authBadge = scanner.authEnabled
+    ? `<span class="badge good">enabled</span>`
+    : `<span class="badge muted">not configured</span>`;
   const authButton = scanner.authEnabled
     ? `<button class="btn btn-secondary" id="auth-btn" ${scanner.authSetupRunning ? 'disabled' : ''}>Re-authenticate</button>`
     : `<button class="btn btn-primary" id="auth-btn" ${scanner.authSetupRunning ? 'disabled' : ''}>Set up LinkedIn auth</button>`;
 
-  const scannerModesHTML = `
-    <div class="section">
-      <h2>Scanner Modes</h2>
-      <div class="stat-list">
-        <div class="stat-row">
-          <span class="key">Default mode (WebSearch + verify)</span>
-          <span class="val good">always on</span>
-        </div>
-        <div class="stat-row">
-          <span class="key">Authenticated LinkedIn (opt-in)</span>
-          <span class="val">${authBadge}</span>
-        </div>
-        <div class="stat-row">
-          <span class="key">LinkedIn URLs added (auth scanner)</span>
-          <span class="val">${scanner.linkedInUrlsAdded}</span>
-        </div>
-        ${scanner.lastLinkedInScan ? `
-        <div class="stat-row">
-          <span class="key">Last LinkedIn auth scan</span>
-          <span class="val">${scanner.lastLinkedInScan}</span>
-        </div>` : ''}
-      </div>
-      <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
-        ${authButton}
-        ${authRunningBadge}
-      </div>
-      <div style="margin-top: 8px; color: var(--subtext); font-size: 11px;">
-        ${scanner.authEnabled
-          ? 'Run: <code>node scan.mjs --linkedin-auth</code> to fetch live LinkedIn URLs.'
-          : 'Click to open a browser and log in to LinkedIn. Required for the opt-in authenticated scanner.'}
-        <br>
-        ⚠️ LinkedIn detects authenticated automation — use sparingly to avoid account restrictions.
-      </div>
-    </div>
-  `;
+  // CV generation card
+  const cvRunning = cvProg.running;
+  const cvBtnLabel = cvRunning ? 'Generating CVs…' : `Generate CVs (${jobs.selected} selected)`;
+  const cvBtnDisabled = cvRunning || jobs.selected === 0 ? 'disabled' : '';
 
-  // ── Liveness Verification card ──
-  const livenessCardHTML = (() => {
-    const isRunning = !!scanProg.running;
-    const hasState = scanProg.status && scanProg.status !== 'idle';
-    const checked = scanProg.checked || 0;
-    const total = scanProg.total || 0;
-    const pct = total > 0 ? (checked / total) * 100 : 0;
-    const activeCount = scanProg.active || 0;
-    const expiredCount = scanProg.expired || 0;
-    const recentActive = scanProg.recentActive || [];
-    const recentExpired = scanProg.recentExpired || [];
+  // Scan now button
+  const scanRunning = scanStatus.running;
+  const scanBtnDisabled = scanRunning ? 'disabled' : '';
 
-    let statusLine = 'No verification has been run.';
-    let progressBar = '';
-    let recents = '';
-    let buttonLabel = 'Verify URLs in pipeline';
-    let buttonDisabled = '';
+  // Liveness button
+  const livenessRunning = livenessStatus.running;
+  const livenessBtnLabel = livenessRunning ? 'Checking liveness…' : `Check liveness (${jobs.unchecked} unchecked)`;
+  const livenessBtnDisabled = livenessRunning || jobs.unchecked === 0 ? 'disabled' : '';
 
-    if (hasState) {
-      if (scanProg.status === 'running' || isRunning) {
-        statusLine = scanProg.current
-          ? `Verifying: <strong>${escapeHTML(scanProg.current)}</strong>`
-          : 'Verifying…';
-        buttonLabel = 'Verifying… (stay on this page)';
-        buttonDisabled = 'disabled';
-      } else if (scanProg.status === 'completed') {
-        statusLine = `Last run: ${scanProg.finishedAt ? scanProg.finishedAt.split('T')[0] : 'recent'} — ${activeCount} active, ${expiredCount} expired (${total} total)`;
-        buttonLabel = 'Run verification again';
-      }
-      progressBar = `
-        <div style="margin-top: 10px;">
-          <div class="bar"><div class="bar-fill ${activeCount > 0 ? 'applied' : 'light'}" style="width: ${pct}%"></div></div>
-          <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--subtext); margin-top: 4px;">
-            <span>${checked} / ${total} checked</span>
-            <span>✓ ${activeCount} active &nbsp; ✗ ${expiredCount} expired</span>
-          </div>
-        </div>`;
-      if (recentActive.length || recentExpired.length) {
-        recents = `
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; font-size: 11px;">
-            <div>
-              <div style="color: var(--green); font-weight: 600; margin-bottom: 4px;">Recent active</div>
-              ${recentActive.slice(0, 5).map(r => `<div style="color: var(--text);">${escapeHTML(r)}</div>`).join('') || '<div style="color: var(--muted);">none yet</div>'}
-            </div>
-            <div>
-              <div style="color: var(--peach); font-weight: 600; margin-bottom: 4px;">Recent expired</div>
-              ${recentExpired.slice(0, 5).map(r => `<div style="color: var(--muted);">${escapeHTML(r)}</div>`).join('') || '<div style="color: var(--muted);">none yet</div>'}
-            </div>
-          </div>`;
-      }
-    }
+  // Check if API key is available for websearch mode
+  const hasApiKey = !!ov.scan?.apiKeySet; // we'll check this below
 
-    return `
-      <div class="section">
-        <h2>URL Liveness Verification</h2>
-        <div style="color: var(--subtext); font-size: 12px;">${statusLine}</div>
-        ${progressBar}
-        ${recents}
-        <div style="margin-top: 12px;">
-          <button class="btn btn-primary" id="verify-btn" ${buttonDisabled}>${buttonLabel}</button>
-        </div>
-        <div style="margin-top: 8px; color: var(--subtext); font-size: 11px;">
-          Reads <code>batch/scan-candidates.json</code>, runs Playwright liveness on each URL, writes active to <code>data/pipeline.md</code> and all results to <code>data/scan-history.tsv</code>.
-        </div>
-      </div>
-    `;
-  })();
+  // Scan log preview
+  const scanLogPreview = scanStatus.log
+    ? `<pre style="margin-top: 8px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; max-height: 200px; overflow-y: auto; white-space: pre-wrap;">${escapeHTML(scanStatus.log.slice(-1200))}</pre>`
+    : '';
 
   const html = `
     <div class="section">
-      <h2>Pipeline Funnel</h2>
+      <h2>Pipeline</h2>
       <div class="funnel">${funnelHTML}</div>
     </div>
 
-    ${scannerModesHTML}
-
-    ${livenessCardHTML}
+    <div class="section">
+      <h2>Scan & Verify</h2>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <select id="scan-mode" style="padding: 6px 8px; background: var(--surface0); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-size: 12px;" ${scanRunning ? 'disabled' : ''}>
+          <option value="api">API scan (Greenhouse/Ashby/Lever)</option>
+          <option value="websearch">WebSearch (uses API key)</option>
+          <option value="both">Both (API + WebSearch)</option>
+        </select>
+        <button class="btn btn-primary" id="scan-btn" ${scanBtnDisabled}>${scanRunning ? 'Scanning…' : 'Scan now'}</button>
+        ${scanner.authEnabled ? `<label style="font-size: 12px; color: var(--subtext); display: flex; align-items: center; gap: 4px;"><input type="checkbox" id="scan-linkedin" ${scanRunning ? 'disabled' : ''}> + LinkedIn</label>` : ''}
+      </div>
+      <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center;">
+        <button class="btn btn-secondary" id="liveness-btn" ${livenessBtnDisabled}>${livenessBtnLabel}</button>
+      </div>
+      <div style="margin-top: 6px; font-size: 11px; color: var(--subtext);">
+        <strong>API</strong> — free, hits company career APIs from portals.yml.
+        <strong>WebSearch</strong> — uses Anthropic API key + Haiku to search LinkedIn/Indeed/Glassdoor via portals.yml queries.
+        <strong>Claude CLI</strong> — run <code>/career-ops scan</code> in Claude for the richest results.
+      </div>
+      ${scanLogPreview}
+    </div>
 
     <div class="cards">
       <div class="section">
-        <h2>Scanner</h2>
+        <h2>Jobs</h2>
         ${statListHTML(scanLines)}
       </div>
       <div class="section">
-        <h2>Light Pass (Haiku)</h2>
-        ${statListHTML(lightLines)}
-        <div class="cta">▸ bash batch/batch-runner.sh --screen --parallel 5</div>
-      </div>
-      <div class="section">
-        <h2>Deep Pass (Sonnet)</h2>
-        ${statListHTML(deepLines)}
-        <div class="cta">▸ bash batch/batch-runner.sh --parallel 3 --limit 10</div>
+        <h2>CV Generation</h2>
+        ${statListHTML(cvLines)}
+        <div style="margin-top: 12px;">
+          <button class="btn btn-primary" id="gen-cv-btn" ${cvBtnDisabled}>${cvBtnLabel}</button>
+        </div>
       </div>
       <div class="section">
         <h2>Applications</h2>
@@ -287,144 +277,350 @@ renderers.overview = async function () {
     </div>
 
     <div class="section">
-      <h2>Top Priorities (next deep pass)</h2>
-      ${prioritiesHTML}
+      <h2>Scanner Modes</h2>
+      <div class="stat-list">
+        <div class="stat-row"><span class="key">API scanner (Greenhouse/Ashby/Lever)</span><span class="val good">always on</span></div>
+        <div class="stat-row"><span class="key">LinkedIn auth</span><span class="val">${authBadge}</span></div>
+        <div class="stat-row"><span class="key">LinkedIn URLs added</span><span class="val">${scanner.linkedInUrlsAdded}</span></div>
+      </div>
+      <div style="margin-top: 12px;">${authButton}</div>
     </div>
   `;
   $('#content').innerHTML = html;
 
-  // Wire the verify button
-  const verifyBtn = $('#verify-btn');
-  if (verifyBtn) {
-    verifyBtn.addEventListener('click', async () => {
-      verifyBtn.disabled = true;
-      verifyBtn.textContent = 'Starting…';
+  // Wire CV generation button
+  const genCvBtn = $('#gen-cv-btn');
+  if (genCvBtn) {
+    genCvBtn.addEventListener('click', async () => {
+      genCvBtn.disabled = true;
+      genCvBtn.textContent = 'Starting…';
       try {
-        const r = await fetch('/api/scan-verify', { method: 'POST' });
+        const r = await fetch('/api/generate-cv', { method: 'POST' });
         const data = await r.json();
-        if (!data.ok) {
-          alert(data.error || 'Failed to start verification');
-          verifyBtn.disabled = false;
-          return;
-        }
-        await renderers.overview();
-        // Poll every 2s while running, re-render to update progress bar
+        if (!data.ok) { alert(data.error); genCvBtn.disabled = false; return; }
         const interval = setInterval(async () => {
           try {
-            const s = await fetchJSON('/api/scan-progress');
-            if (!s.running && s.status === 'completed') {
-              clearInterval(interval);
-            }
+            const s = await fetchJSON('/api/cv-progress');
+            if (!s.running) clearInterval(interval);
             await renderers.overview();
           } catch {}
-        }, 2000);
+        }, 3000);
       } catch (err) {
-        alert('Error: ' + err.message);
-        verifyBtn.disabled = false;
+        alert(err.message);
+        genCvBtn.disabled = false;
       }
     });
   }
 
-  // Wire the auth-setup button
-  const btn = $('#auth-btn');
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'Opening browser…';
+  // Wire auth button
+  const authBtn = $('#auth-btn');
+  if (authBtn) {
+    authBtn.addEventListener('click', async () => {
+      authBtn.disabled = true;
+      authBtn.textContent = 'Opening browser…';
       try {
         const r = await fetch('/api/auth-setup', { method: 'POST' });
         const data = await r.json();
-        if (!data.ok) {
-          alert(data.error || 'Failed to start auth setup');
-          btn.disabled = false;
-          btn.textContent = scanner.authEnabled ? 'Re-authenticate' : 'Set up LinkedIn auth';
-          return;
-        }
-        // Re-render so the "browser open" badge appears + start aggressive polling
+        if (!data.ok) { alert(data.error); authBtn.disabled = false; return; }
         await renderers.overview();
-        // Poll every 2s for up to 5 minutes — when authSetupRunning flips to false
-        // and authEnabled flips to true, we know it succeeded
-        let polls = 0;
-        const maxPolls = 150; // 5 min
         const interval = setInterval(async () => {
-          polls++;
-          if (polls > maxPolls) { clearInterval(interval); return; }
           try {
             const s = await fetchJSON('/api/scanner-status');
-            if (!s.authSetupRunning) {
-              clearInterval(interval);
-              await renderers.overview();
-            }
+            if (!s.authSetupRunning) { clearInterval(interval); await renderers.overview(); }
           } catch {}
         }, 2000);
-      } catch (err) {
-        alert('Error: ' + err.message);
-        btn.disabled = false;
-      }
+      } catch (err) { alert(err.message); authBtn.disabled = false; }
+    });
+  }
+
+  // Wire scan button
+  const scanBtn = $('#scan-btn');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+      scanBtn.disabled = true;
+      scanBtn.textContent = 'Scanning…';
+      const mode = $('#scan-mode')?.value || 'api';
+      const linkedin = $('#scan-linkedin')?.checked ? '1' : '0';
+      try {
+        const r = await fetch(`/api/scan-now?mode=${mode}&linkedin=${linkedin}`, { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) { alert(data.error); scanBtn.disabled = false; scanBtn.textContent = 'Scan now'; return; }
+        const interval = setInterval(async () => {
+          try {
+            const s = await fetchJSON('/api/scan-now-status');
+            if (!s.running) { clearInterval(interval); }
+            await renderers.overview();
+          } catch {}
+        }, 2000);
+      } catch (err) { alert(err.message); scanBtn.disabled = false; scanBtn.textContent = 'Scan now'; }
+    });
+  }
+
+  // Wire liveness button
+  const livenessBtn = $('#liveness-btn');
+  if (livenessBtn) {
+    livenessBtn.addEventListener('click', async () => {
+      livenessBtn.disabled = true;
+      livenessBtn.textContent = 'Starting…';
+      try {
+        const r = await fetch('/api/liveness-check', { method: 'POST' });
+        const data = await r.json();
+        if (!data.ok) { alert(data.error); livenessBtn.disabled = false; return; }
+        livenessBtn.textContent = 'Checking… (refresh to see progress)';
+        const interval = setInterval(async () => {
+          try {
+            const s = await fetchJSON('/api/liveness-status');
+            if (!s.running) { clearInterval(interval); await renderers.overview(); }
+          } catch {}
+        }, 3000);
+      } catch (err) { alert(err.message); livenessBtn.disabled = false; }
     });
   }
 };
 
-// ── Inbox ──────────────────────────────────────────────────────
+// ── Jobs ──────────────────────────────────────────────────────
 
-renderers.inbox = async function () {
-  const { items, stats } = await fetchJSON('/api/inbox');
+renderers.jobs = async function () {
+  const { jobs, stats } = await fetchJSON('/api/jobs');
 
-  const filtered = items.filter(it => {
-    const hasLight = it.lightScore > 0;
-    const hasDeep = !!it.deepReport;
-    if (inboxFilter === 'all') return true;
-    if (inboxFilter === 'untouched') return !hasLight && !hasDeep;
-    if (inboxFilter === 'light') return hasLight && !hasDeep;
-    if (inboxFilter === 'deep') return hasDeep;
+  const livenessDot = (l) => {
+    if (l === 'active') return '<span style="color: var(--green);">●</span>';
+    if (l === 'expired') return '<span style="color: var(--red);">●</span>';
+    if (l === 'uncertain') return '<span style="color: var(--yellow);">●</span>';
+    return '<span style="color: var(--muted);">○</span>';
+  };
+
+  const filtered = jobs.filter(j => {
+    if (jobsFilter === 'all') return true;
+    if (jobsFilter === 'active') return j.liveness === 'active';
+    if (jobsFilter === 'selected') return j.selected;
+    if (jobsFilter === 'cv-done') return j.cvStatus === 'done';
+    if (jobsFilter === 'unchecked') return j.liveness === 'unchecked';
     return true;
-  }).sort((a, b) => {
-    const aKey = a.deepReport ? 100 + a.deepScore : a.lightScore;
-    const bKey = b.deepReport ? 100 + b.deepScore : b.lightScore;
-    return bKey - aKey;
   });
 
-  const tabs = [
+  const filterTabs = [
     { key: 'all',       label: `All (${stats.total})` },
-    { key: 'untouched', label: `Untouched (${stats.untouched})` },
-    { key: 'light',     label: `Light-passed (${stats.lightOnly})` },
-    { key: 'deep',      label: `Deep-done (${stats.deepDone})` },
+    { key: 'active',    label: `Active (${stats.active})` },
+    { key: 'unchecked', label: `Unchecked (${stats.unchecked})` },
+    { key: 'selected',  label: `Selected (${stats.selected})` },
+    { key: 'cv-done',   label: `CV done (${stats.cvDone})` },
   ];
 
-  const tabsHTML = tabs.map(t =>
-    `<button class="${t.key === inboxFilter ? 'active' : ''}" data-filter="${t.key}">${t.label}</button>`
+  const tabsHTML = filterTabs.map(t =>
+    `<button class="${t.key === jobsFilter ? 'active' : ''}" data-filter="${t.key}">${t.label}</button>`
   ).join('');
 
   const rowsHTML = filtered.length === 0
-    ? `<tr><td colspan="6"><div class="empty-state">no items match this filter</div></td></tr>`
-    : filtered.map(it => `
+    ? `<tr><td colspan="7"><div class="empty-state">no jobs match this filter</div></td></tr>`
+    : filtered.map(j => `
         <tr>
-          <td>${it.number}</td>
-          <td><span class="tag ${it.source}">${it.source}</span></td>
-          <td>${it.lightScore > 0 ? `<span class="score ${scoreCls(it.lightScore)}">${it.lightScore.toFixed(1)}</span>` : '—'}</td>
-          <td>${it.deepReport ? `<span class="score ${scoreCls(it.deepScore)}">${it.deepReport} (${it.deepScore.toFixed(1)})</span>` : '—'}</td>
-          <td>${escapeHTML(it.company)}</td>
-          <td><a href="${escapeHTML(it.url)}" target="_blank" rel="noopener">${escapeHTML(it.role)} ↗</a></td>
+          <td><input type="checkbox" class="job-select" data-url="${escapeHTML(j.url)}" ${j.selected ? 'checked' : ''}></td>
+          <td>${livenessDot(j.liveness)}</td>
+          <td><span class="tag ${j.source.split('-')[0]}">${j.source}</span></td>
+          <td>${escapeHTML(j.company)}</td>
+          <td><a href="${escapeHTML(j.url)}" target="_blank" rel="noopener">${escapeHTML(j.role)} ↗</a></td>
+          <td>${j.cvStatus ? `<span class="status-tag ${j.cvStatus}">${j.cvStatus}</span>` : '—'}</td>
+          <td style="font-size: 11px; color: var(--subtext);">${j.scanDate}</td>
         </tr>
       `).join('');
 
   $('#content').innerHTML = `
     <div class="section">
-      <h2>Pipeline Inbox — ${stats.total} URLs</h2>
+      <h2>Jobs — ${stats.total} total</h2>
       <div class="filter-tabs">${tabsHTML}</div>
+      <div style="margin: 10px 0; display: flex; gap: 8px;">
+        <button class="btn btn-secondary" id="select-all-active">Select all active</button>
+        <button class="btn btn-secondary" id="deselect-all">Deselect all</button>
+        <button class="btn btn-primary" id="gen-cv-btn-jobs" ${stats.selected === 0 ? 'disabled' : ''}>Generate CVs (${stats.selected})</button>
+      </div>
       <table>
         <thead>
-          <tr><th>#</th><th>Source</th><th>Light</th><th>Deep</th><th>Company</th><th>Role</th></tr>
+          <tr><th style="width:30px;">✓</th><th>Live</th><th>Source</th><th>Company</th><th>Role</th><th>CV</th><th>Scanned</th></tr>
         </thead>
         <tbody>${rowsHTML}</tbody>
       </table>
     </div>
   `;
 
-  $$('.filter-tabs button').forEach(b => b.addEventListener('click', () => {
-    inboxFilter = b.dataset.filter;
-    renderers.inbox();
+  // Wire checkboxes
+  $$('.job-select').forEach(cb => cb.addEventListener('change', async () => {
+    await fetch('/api/select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: cb.dataset.url, selected: cb.checked }),
+    });
   }));
+
+  // Select all active
+  $('#select-all-active')?.addEventListener('click', async () => {
+    const activeJobs = jobs.filter(j => j.liveness === 'active' && !j.selected);
+    for (const j of activeJobs) {
+      await fetch('/api/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: j.url, selected: true }),
+      });
+    }
+    await renderers.jobs();
+  });
+
+  // Deselect all
+  $('#deselect-all')?.addEventListener('click', async () => {
+    const selectedJobs = jobs.filter(j => j.selected);
+    for (const j of selectedJobs) {
+      await fetch('/api/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: j.url, selected: false }),
+      });
+    }
+    await renderers.jobs();
+  });
+
+  // Generate CVs button
+  $('#gen-cv-btn-jobs')?.addEventListener('click', async () => {
+    const btn = $('#gen-cv-btn-jobs');
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    try {
+      const r = await fetch('/api/generate-cv', { method: 'POST' });
+      const data = await r.json();
+      if (!data.ok) { alert(data.error); btn.disabled = false; return; }
+      const interval = setInterval(async () => {
+        try {
+          const s = await fetchJSON('/api/cv-progress');
+          if (!s.running) { clearInterval(interval); await renderers.jobs(); }
+        } catch {}
+      }, 3000);
+    } catch (err) { alert(err.message); btn.disabled = false; }
+  });
+
+  // Filter tabs
+  $$('.filter-tabs button').forEach(b => b.addEventListener('click', () => {
+    jobsFilter = b.dataset.filter;
+    renderers.jobs();
+  }));
+};
+
+// ── Keywords ──────────────────────────────────────────────────
+
+renderers.keywords = async function () {
+  const kw = await fetchJSON('/api/keywords');
+  const allKw = [...(kw.keywords || []).map(k => ({ ...k, userAdded: false })), ...(kw.user_added || []).map(k => ({ ...k, source: 'user', userAdded: true }))];
+  const pending = kw.pending_suggestions || [];
+
+  const pendingHTML = pending.length === 0 ? '' : `
+    <div class="section" style="border-left: 3px solid var(--yellow); padding-left: 12px;">
+      <h3 style="color: var(--yellow);">Source files changed — new keyword suggestions</h3>
+      <p style="font-size: 12px; color: var(--subtext);">Your CV, profile, or digest has changed. Review these suggested keywords:</p>
+      ${pending.map(p => `
+        <div style="display: flex; align-items: center; gap: 8px; margin: 6px 0;">
+          <span>${escapeHTML(p.term)}</span>
+          <span class="tag ${p.source}">${p.source}</span>
+          <button class="btn btn-secondary accept-suggestion" data-term="${escapeHTML(p.term)}" data-source="${escapeHTML(p.source)}" style="padding: 2px 8px; font-size: 11px;">Accept</button>
+        </div>
+      `).join('')}
+      <button class="btn btn-secondary" id="dismiss-suggestions" style="margin-top: 8px;">Dismiss all</button>
+    </div>
+  `;
+
+  const rowsHTML = allKw.map(k => `
+    <tr>
+      <td>
+        <label class="toggle">
+          <input type="checkbox" class="kw-toggle" data-term="${escapeHTML(k.term)}" ${k.enabled ? 'checked' : ''}>
+          <span class="toggle-slider"></span>
+        </label>
+      </td>
+      <td>${escapeHTML(k.term)}</td>
+      <td><span class="tag ${k.source}">${k.source}</span></td>
+      <td>${k.userAdded ? `<button class="btn btn-secondary kw-remove" data-term="${escapeHTML(k.term)}" style="padding: 2px 8px; font-size: 11px; color: var(--red);">Remove</button>` : ''}</td>
+    </tr>
+  `).join('');
+
+  $('#content').innerHTML = `
+    ${pendingHTML}
+    <div class="section">
+      <h2>Search Keywords</h2>
+      <p style="font-size: 12px; color: var(--subtext);">These keywords are used by LinkedIn scanner and WebSearch. Toggle to enable/disable. Add your own below.</p>
+      <table>
+        <thead><tr><th style="width: 50px;">On</th><th>Keyword</th><th>Source</th><th></th></tr></thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+      <div style="margin-top: 16px; display: flex; gap: 8px;">
+        <input type="text" id="new-keyword" placeholder="Add a keyword…" style="flex: 1; padding: 6px 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px;">
+        <button class="btn btn-primary" id="add-keyword">Add</button>
+        <button class="btn btn-secondary" id="regen-keywords">Regenerate from profile</button>
+      </div>
+      <div style="margin-top: 8px; font-size: 11px; color: var(--subtext);">
+        Generated from: cv.md, config/profile.yml, article-digest.md
+        ${kw.generated_at ? ` · last generated: ${kw.generated_at}` : ''}
+      </div>
+    </div>
+  `;
+
+  // Wire toggles
+  $$('.kw-toggle').forEach(cb => cb.addEventListener('change', async () => {
+    await fetch('/api/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle', term: cb.dataset.term }),
+    });
+  }));
+
+  // Wire remove buttons
+  $$('.kw-remove').forEach(btn => btn.addEventListener('click', async () => {
+    await fetch('/api/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'remove', term: btn.dataset.term }),
+    });
+    await renderers.keywords();
+  }));
+
+  // Wire add keyword
+  $('#add-keyword')?.addEventListener('click', async () => {
+    const input = $('#new-keyword');
+    const term = input?.value?.trim();
+    if (!term) return;
+    await fetch('/api/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add', term }),
+    });
+    input.value = '';
+    await renderers.keywords();
+  });
+
+  // Wire regenerate
+  $('#regen-keywords')?.addEventListener('click', async () => {
+    const btn = $('#regen-keywords');
+    btn.disabled = true;
+    btn.textContent = 'Regenerating…';
+    await fetch('/api/keywords/regenerate', { method: 'POST' });
+    await renderers.keywords();
+  });
+
+  // Wire accept suggestion
+  $$('.accept-suggestion').forEach(btn => btn.addEventListener('click', async () => {
+    await fetch('/api/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'accept-suggestion', term: btn.dataset.term, source: btn.dataset.source }),
+    });
+    await renderers.keywords();
+  }));
+
+  // Wire dismiss suggestions
+  $('#dismiss-suggestions')?.addEventListener('click', async () => {
+    await fetch('/api/keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'dismiss-suggestions' }),
+    });
+    await renderers.keywords();
+  });
 };
 
 // ── Tracker ────────────────────────────────────────────────────
@@ -605,10 +801,326 @@ renderers.profile = async function () {
   }));
 };
 
+// ── Settings ───────────────────────────────────────────────────
+
+renderers.settings = async function () {
+  const keys = await fetchJSON('/api/settings/keys');
+  const anthropicSet = !!keys.anthropic;
+
+  $('#content').innerHTML = `
+    <div class="section">
+      <h2>Settings — API keys</h2>
+      <p style="color: var(--subtext); font-size: 12px;">
+        Stored in <code>.env</code> at the project root (gitignored, 0600 perms). The key is used by the light pass API mode and works for Haiku, Sonnet, and Opus.
+      </p>
+
+      <div style="margin-top: 16px;">
+        <label for="anthropic-key" style="font-size: 12px; color: var(--subtext); display: block; margin-bottom: 6px;">
+          Anthropic API key ${anthropicSet ? `<span style="color: var(--green);">· saved (${escapeHTML(keys.anthropic)})</span>` : '<span style="color: var(--muted);">· not set</span>'}
+        </label>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <input type="password" id="anthropic-key" placeholder="${anthropicSet ? 'Paste to replace' : 'sk-ant-api03-...'}" autocomplete="off" style="flex: 1; min-width: 320px; padding: 6px 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 12px;">
+          <button class="btn btn-secondary" id="anthropic-reveal" type="button">Show</button>
+          <button class="btn btn-primary" id="anthropic-save" type="button">Save</button>
+          ${anthropicSet ? `<button class="btn btn-secondary" id="anthropic-delete" type="button" style="color: var(--red);">Remove</button>` : ''}
+        </div>
+        <div id="anthropic-status" style="margin-top: 8px; font-size: 11px; color: var(--subtext); min-height: 14px;"></div>
+      </div>
+
+      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--subtext); font-size: 11px;">
+        Get a key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" style="color: var(--blue);">console.anthropic.com/settings/keys</a>. One key covers Haiku / Sonnet / Opus.
+      </div>
+    </div>
+  `;
+
+  const input = $('#anthropic-key');
+  const status = $('#anthropic-status');
+
+  $('#anthropic-reveal').addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+    $('#anthropic-reveal').textContent = input.type === 'password' ? 'Show' : 'Hide';
+  });
+
+  $('#anthropic-save').addEventListener('click', async () => {
+    const value = input.value.trim();
+    if (!value) { status.textContent = 'Paste a key first.'; status.style.color = 'var(--peach)'; return; }
+    status.textContent = 'Saving…';
+    status.style.color = 'var(--subtext)';
+    try {
+      const r = await fetch('/api/settings/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ anthropic: value }),
+      });
+      const d = await r.json();
+      if (!d.ok) { status.textContent = `✗ ${d.error}`; status.style.color = 'var(--red)'; return; }
+      input.value = '';
+      input.type = 'password';
+      status.textContent = `✓ Saved (${d.anthropic}). Light pass API mode is now available.`;
+      status.style.color = 'var(--green)';
+      setTimeout(() => renderers.settings(), 800);
+    } catch (err) {
+      status.textContent = `✗ ${err.message}`;
+      status.style.color = 'var(--red)';
+    }
+  });
+
+  const delBtn = $('#anthropic-delete');
+  if (delBtn) {
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Remove the saved Anthropic API key from .env?')) return;
+      status.textContent = 'Removing…';
+      try {
+        const r = await fetch('/api/settings/keys', { method: 'DELETE' });
+        const d = await r.json();
+        if (!d.ok) { status.textContent = `✗ ${d.error}`; status.style.color = 'var(--red)'; return; }
+        status.textContent = '✓ Removed';
+        status.style.color = 'var(--green)';
+        setTimeout(() => renderers.settings(), 600);
+      } catch (err) {
+        status.textContent = `✗ ${err.message}`;
+        status.style.color = 'var(--red)';
+      }
+    });
+  }
+};
+
+// ── Setup Wizard ──────────────────────────────────────────────
+
+let setupStatus = null;
+
+renderers.setup = async function () {
+  const status = await fetchJSON('/api/setup-status');
+  setupStatus = status;
+
+  // Determine current step
+  let step = 1;
+  if (status.cv) step = 2;
+  if (status.cv && status.profile) step = 3;
+  if (status.cv && status.profile && status.portals) step = 4;
+  if (status.cv && status.profile && status.portals && status.keywords) step = 5;
+
+  const steps = ['CV', 'Profile', 'Portals', 'Keywords', 'Done'];
+  const progressHTML = steps.map((s, i) => {
+    const n = i + 1;
+    const cls = n < step ? 'done' : n === step ? 'active' : '';
+    return `<div class="wizard-dot ${cls}"><span>${n}</span><label>${s}</label></div>`;
+  }).join('<div class="wizard-line"></div>');
+
+  let stepHTML = '';
+
+  if (step === 1) {
+    stepHTML = `
+      <div class="wizard-step">
+        <h3>Step 1: Your CV</h3>
+        <p>Paste your resume or CV below. Plain text or markdown — we'll use it to generate search keywords and tailor CVs for each job.</p>
+        <textarea id="setup-cv" class="wizard-textarea" rows="16" placeholder="Paste your CV here…&#10;&#10;# Your Name&#10;&#10;## Experience&#10;&#10;### Company — Location&#10;**Job Title**&#10;Date range&#10;&#10;- Achievement 1&#10;- Achievement 2"></textarea>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" id="setup-cv-save">Save & continue</button>
+          <button class="btn btn-secondary" id="setup-cv-skip">Skip for now</button>
+        </div>
+      </div>
+    `;
+  } else if (step === 2) {
+    stepHTML = `
+      <div class="wizard-step">
+        <h3>Step 2: Your Profile</h3>
+        <p>Tell us about yourself and what roles you're targeting.</p>
+        <div class="wizard-form">
+          <div class="wizard-field">
+            <label>Full name *</label>
+            <input type="text" id="setup-name" placeholder="Jane Smith">
+          </div>
+          <div class="wizard-field">
+            <label>Email</label>
+            <input type="email" id="setup-email" placeholder="jane@example.com">
+          </div>
+          <div class="wizard-field">
+            <label>Phone</label>
+            <input type="text" id="setup-phone" placeholder="+1-555-0123">
+          </div>
+          <div class="wizard-field">
+            <label>Location</label>
+            <input type="text" id="setup-location" placeholder="NYC / Remote">
+          </div>
+          <div class="wizard-field">
+            <label>Target roles (comma-separated) *</label>
+            <input type="text" id="setup-roles" placeholder="Financial Analyst, Business Analyst, Strategy Analyst">
+          </div>
+          <div class="wizard-field">
+            <label>Salary range</label>
+            <input type="text" id="setup-salary" placeholder="$100K-150K">
+          </div>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" id="setup-profile-save">Save & continue</button>
+          <button class="btn btn-secondary" id="setup-profile-skip">Skip for now</button>
+        </div>
+      </div>
+    `;
+  } else if (step === 3) {
+    stepHTML = `
+      <div class="wizard-step">
+        <h3>Step 3: Job Portals</h3>
+        <p>The scanner searches LinkedIn, Indeed, Glassdoor, Greenhouse, and 20+ other job boards for your target roles. We'll configure the search queries based on the roles you entered.</p>
+        <p style="font-size: 12px; color: var(--subtext);">You can customize <code>portals.yml</code> later to add specific companies or adjust search queries.</p>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" id="setup-portals-save">Use defaults & continue</button>
+          <button class="btn btn-secondary" id="setup-portals-skip">Skip for now</button>
+        </div>
+      </div>
+    `;
+  } else if (step === 4) {
+    // Auto-generate keywords and show them
+    stepHTML = `
+      <div class="wizard-step">
+        <h3>Step 4: Search Keywords</h3>
+        <p>Generating keywords from your CV and profile…</p>
+        <div id="setup-keywords-result"></div>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" id="setup-keywords-done" disabled>Looks good — finish setup</button>
+        </div>
+      </div>
+    `;
+  } else {
+    stepHTML = `
+      <div class="wizard-step">
+        <h3>You're all set!</h3>
+        <p>Your profile is configured and keywords are ready. Here's what to do next:</p>
+        <div class="stat-list" style="margin: 16px 0;">
+          <div class="stat-row"><span class="key">1. Scan for jobs</span><span class="val">Click "Scan now" on the Overview tab</span></div>
+          <div class="stat-row"><span class="key">2. Check liveness</span><span class="val">Verify which jobs are still open</span></div>
+          <div class="stat-row"><span class="key">3. Select & apply</span><span class="val">Check jobs in the Jobs tab, generate tailored CVs</span></div>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn-primary" id="setup-go-overview">Go to Overview</button>
+        </div>
+      </div>
+    `;
+  }
+
+  $('#content').innerHTML = `
+    <div class="section">
+      <h2>Setup</h2>
+      <div class="wizard-progress">${progressHTML}</div>
+      ${stepHTML}
+    </div>
+  `;
+
+  // Wire step 1
+  $('#setup-cv-save')?.addEventListener('click', async () => {
+    const content = $('#setup-cv')?.value;
+    if (!content?.trim()) { alert('Please paste your CV first.'); return; }
+    const btn = $('#setup-cv-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const r = await fetch('/api/setup/cv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error); btn.disabled = false; btn.textContent = 'Save & continue'; return; }
+    await renderers.setup();
+  });
+  $('#setup-cv-skip')?.addEventListener('click', async () => {
+    // Write a placeholder
+    await fetch('/api/setup/cv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: '# My CV\n\n(paste your CV here later)' }) });
+    await renderers.setup();
+  });
+
+  // Wire step 2
+  $('#setup-profile-save')?.addEventListener('click', async () => {
+    const name = $('#setup-name')?.value?.trim();
+    if (!name) { alert('Name is required.'); return; }
+    const roles = $('#setup-roles')?.value?.trim();
+    if (!roles) { alert('Enter at least one target role.'); return; }
+    const btn = $('#setup-profile-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const r = await fetch('/api/setup/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email: $('#setup-email')?.value?.trim() || '',
+        phone: $('#setup-phone')?.value?.trim() || '',
+        location: $('#setup-location')?.value?.trim() || '',
+        targetRoles: roles,
+        salaryRange: $('#setup-salary')?.value?.trim() || '',
+      }),
+    });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error); btn.disabled = false; btn.textContent = 'Save & continue'; return; }
+    await renderers.setup();
+  });
+  $('#setup-profile-skip')?.addEventListener('click', async () => {
+    await fetch('/api/setup/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'User', targetRoles: 'Analyst', salaryRange: '' }),
+    });
+    await renderers.setup();
+  });
+
+  // Wire step 3
+  $('#setup-portals-save')?.addEventListener('click', async () => {
+    const btn = $('#setup-portals-save');
+    btn.disabled = true; btn.textContent = 'Setting up…';
+    const r = await fetch('/api/setup/portals', { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error); btn.disabled = false; btn.textContent = 'Use defaults & continue'; return; }
+    await renderers.setup();
+  });
+  $('#setup-portals-skip')?.addEventListener('click', async () => {
+    // Just copy the template as-is
+    await fetch('/api/setup/portals', { method: 'POST' });
+    await renderers.setup();
+  });
+
+  // Wire step 4 — auto-generate keywords
+  if (step === 4) {
+    const r = await fetch('/api/setup/keywords', { method: 'POST' });
+    const d = await r.json();
+    const container = $('#setup-keywords-result');
+    const doneBtn = $('#setup-keywords-done');
+    if (d.ok && d.keywords) {
+      const all = [...d.keywords, ...(d.user_added || [])];
+      container.innerHTML = `
+        <p style="color: var(--green);">${all.length} keywords generated:</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0;">
+          ${all.filter(k => k.enabled).map(k => `<span class="tag ${k.source}">${escapeHTML(k.term)}</span>`).join('')}
+        </div>
+        <p style="font-size: 12px; color: var(--subtext);">You can manage these in the Keywords tab anytime.</p>
+      `;
+      doneBtn.disabled = false;
+    } else {
+      container.innerHTML = `<p style="color: var(--peach);">Could not generate keywords: ${escapeHTML(d.error || 'unknown error')}. You can set them up later in the Keywords tab.</p>`;
+      doneBtn.disabled = false;
+      doneBtn.textContent = 'Continue anyway';
+    }
+  }
+  $('#setup-keywords-done')?.addEventListener('click', () => {
+    // Remove setup tab and go to overview
+    if (tabs.includes('setup')) tabs.splice(tabs.indexOf('setup'), 1);
+    updateNav();
+    location.hash = '#/overview';
+    activateTab('overview');
+  });
+
+  // Wire step 5
+  $('#setup-go-overview')?.addEventListener('click', () => {
+    if (tabs.includes('setup')) tabs.splice(tabs.indexOf('setup'), 1);
+    updateNav();
+    location.hash = '#/overview';
+    activateTab('overview');
+  });
+};
+
 // ── Routing & polling ──────────────────────────────────────────
 
+function updateNav() {
+  const nav = $('nav#tabs');
+  nav.className = 'pill-nav';
+  nav.innerHTML = tabs.map(t =>
+    `<a href="#/${t}" data-tab="${t}">${t.charAt(0).toUpperCase() + t.slice(1)}</a>`
+  ).join('');
+}
+
 function activateTab(name) {
-  if (!tabs.includes(name)) name = 'overview';
+  if (!tabs.includes(name)) name = tabs[0];
   currentTab = name;
   $$('nav#tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
   render();
@@ -616,6 +1128,7 @@ function activateTab(name) {
 
 async function render() {
   try {
+    updateHero(); // fire-and-forget — updates hero stats independently
     const fn = renderers[currentTab];
     if (fn) await fn();
     setStatus(true);
@@ -636,7 +1149,7 @@ function stopPoll() {
 }
 
 window.addEventListener('hashchange', () => {
-  const tab = location.hash.replace(/^#\/?/, '').split('/')[0] || 'overview';
+  const tab = location.hash.replace(/^#\/?/, '').split('/')[0] || tabs[0];
   activateTab(tab);
 });
 
@@ -649,7 +1162,28 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// initial
-const initialTab = location.hash.replace(/^#\/?/, '').split('/')[0] || 'overview';
-activateTab(initialTab);
-startPoll();
+// ── Initial load — check setup status first ──────────────────
+async function init() {
+  try {
+    const status = await fetchJSON('/api/setup-status');
+    setupStatus = status;
+    if (!status.complete) {
+      // Insert setup tab at the front
+      if (!tabs.includes('setup')) tabs.unshift('setup');
+      updateNav();
+      activateTab('setup');
+    } else {
+      // Remove setup tab if present
+      if (tabs.includes('setup')) tabs.splice(tabs.indexOf('setup'), 1);
+      const initialTab = location.hash.replace(/^#\/?/, '').split('/')[0] || 'overview';
+      activateTab(initialTab);
+    }
+  } catch {
+    // Can't reach server — just show overview
+    const initialTab = location.hash.replace(/^#\/?/, '').split('/')[0] || 'overview';
+    activateTab(initialTab);
+  }
+  startPoll();
+}
+
+init();

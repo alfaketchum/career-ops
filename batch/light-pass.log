@@ -1,0 +1,44 @@
+API light pass: 38 URLs, chunk=10, parallel=3, model=claude-haiku-4-5-20251001
+chunk 1/4 (10 urls)
+chunk 2/4 (10 urls)
+chunk 3/4 (10 urls)
+  ✓ 134 Business Operations Lead 3.25 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 135 Business Operations Associate 2.5 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 136 Business Development Lead 3.5 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 137 Director of Growth & Business Operations 3.5 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 138 VP of Brand Partnerships 3 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 139 ? 2.75 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 140 ? 1.75 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 141 Director of Business Development & Partnerships 2.5 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 142 ? 2 cache_read=4655 cache_create=0 in=596 out=1273
+  ✓ 143 Business Development Manager 3.75 cache_read=4655 cache_create=0 in=596 out=1273
+chunk 4/4 (8 urls)
+  ✓ 144 ? 4 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 145 Business Development Manager 3.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 146 VP Business Development & Strategy 2.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 147 Business Development and Partnerships Lead 3.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 148 Business Development Manager 3.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 149 ? 2 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 150 Founding Partnerships Lead 3 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 151 Head of Business Development 2.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 152 Vice President, Partnerships 2.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 153 Vice President, Business Development and Sales 1.5 cache_read=4655 cache_create=0 in=597 out=1371
+  ✓ 154 Strategic Partnerships Manager 3.5 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 155 Business Development Manager 3 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 156 ? 3 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 157 Strategic Partner Manager 3.5 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 158 Director of Business Development 3.5 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 159 Influencer Marketing 3 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 160 VP of Brand Partnerships, Agency Lead 4 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 161 ? 3.5 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 162 Influencer Marketing Coordinator 2 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 163 ? 2.5 cache_read=4655 cache_create=0 in=607 out=1452
+  ✓ 164 Head of Creator Partnerships 3.5 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 165 Director, Influencer Marketing & PR 3 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 166 Creator Partnerships & Social Commerce Manager 3.25 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 167 Partnerships Manager (Talent&Brand) 3 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 168 Regulatory Compliance Analyst 2 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 169 Compliance Analyst 1.5 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 170 Compliance Analyst 1.5 cache_read=4655 cache_create=0 in=510 out=1187
+  ✓ 171 ? 1.5 cache_read=4655 cache_create=0 in=510 out=1187
+=== API light pass complete ===

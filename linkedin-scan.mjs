@@ -43,6 +43,8 @@ const PORTALS_PATH = 'portals.yml';
 const SCAN_HISTORY = 'data/scan-history.tsv';
 const PIPELINE = 'data/pipeline.md';
 const APPLICATIONS = 'data/applications.md';
+const JOBS_TSV = 'data/jobs.tsv';
+const JOBS_HEADER = 'url\tcompany\trole\tsource\tscan_date\tliveness\tselected\tcv_status\tcv_date\tnotes';
 
 const TIMEOUT_MS = 25000;
 
@@ -57,17 +59,32 @@ const maxPerQuery = maxIdx >= 0 ? parseInt(args[maxIdx + 1], 10) : 25;
 const queryIdx = args.indexOf('--query');
 const oneOffQuery = queryIdx >= 0 ? args[queryIdx + 1] : null;
 
-// ── default queries ───────────────────────────────────────────────
+// ── default queries (auto-generated from keywords.json if available) ──
 
-const DEFAULT_QUERIES = [
-  // f_WT=2 = Remote, sortBy=DD = newest first
+function loadAutoQueries() {
+  const kwPath = 'data/keywords.json';
+  if (!existsSync(kwPath)) return null;
+  try {
+    const kw = JSON.parse(readFileSync(kwPath, 'utf8'));
+    const enabled = [
+      ...(kw.keywords || []).filter(k => k.enabled),
+      ...(kw.user_added || []).filter(k => k.enabled),
+    ];
+    if (enabled.length === 0) return null;
+    return enabled.map(k => ({
+      name: `LinkedIn — ${k.term} (Remote)`,
+      q: k.term,
+      remote: true,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_QUERIES = loadAutoQueries() || [
   { name: 'LinkedIn — Financial Analyst (Remote)',  q: 'Financial Analyst',  remote: true },
   { name: 'LinkedIn — Credit Analyst (Remote)',     q: 'Credit Analyst',     remote: true },
   { name: 'LinkedIn — Business Analyst (Remote)',   q: 'Business Analyst',   remote: true },
-  { name: 'LinkedIn — FP&A (Remote)',               q: 'FP&A',               remote: true },
-  { name: 'LinkedIn — BD Partnerships (Remote)',    q: 'Business Development Partnerships', remote: true },
-  { name: 'LinkedIn — Strategy Analyst (Remote)',   q: 'Strategy Analyst',   remote: true },
-  { name: 'LinkedIn — Influencer Marketing (Remote)', q: 'Influencer Marketing', remote: true },
 ];
 
 // ── load filters ──────────────────────────────────────────────────
@@ -264,7 +281,22 @@ async function main() {
     appendFileSync(PIPELINE, pipeRows, 'utf8');
   }
 
-  console.log(`\n✓ Wrote ${allNew.length} new URLs to ${PIPELINE} and ${SCAN_HISTORY}`);
+  // Append to jobs.tsv (unified state)
+  if (!existsSync(JOBS_TSV)) {
+    writeFileSync(JOBS_TSV, JOBS_HEADER + '\n', 'utf8');
+  }
+  const existingJobs = new Set();
+  for (const line of readFileSync(JOBS_TSV, 'utf8').split('\n').slice(1)) {
+    const url = line.split('\t')[0];
+    if (url) existingJobs.add(url);
+  }
+  const jobRows = allNew
+    .filter(r => !existingJobs.has(r.url))
+    .map(r => [r.url, r.company, r.title, 'linkedin-auth', today, 'unchecked', '', '', '', ''].join('\t'))
+    .join('\n');
+  if (jobRows) appendFileSync(JOBS_TSV, jobRows + '\n', 'utf8');
+
+  console.log(`\n✓ Wrote ${allNew.length} new URLs to ${PIPELINE}, ${SCAN_HISTORY}, and ${JOBS_TSV}`);
 }
 
 main().catch(err => {

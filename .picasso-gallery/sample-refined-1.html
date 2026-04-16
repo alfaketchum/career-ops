@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refined 1: Subtle Electric</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: #f4f6fb; color: #0c1222; line-height: 1.5; font-size: 15px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 32px; background: #fff; border-bottom: 1px solid #dfe4f0; }
+.topbar .brand { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; color: #1a6bff; }
+.topbar .brand span { color: #0c1222; }
+.topbar nav { display: flex; gap: 6px; }
+.topbar nav a { padding: 8px 16px; border-radius: 8px; text-decoration: none; color: #5c6480; font-size: 14px; font-weight: 500; transition: background 0.15s ease, color 0.15s ease; }
+.topbar nav a:hover { background: #edf1fc; color: #1a6bff; }
+.topbar nav a.active { background: #1a6bff; color: #fff; }
+.container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+.hero { margin-bottom: 36px; }
+.hero h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 4px; color: #0c1222; }
+.hero p { color: #5c6480; }
+.hero p strong { color: #1a6bff; font-weight: 600; }
+.next-step { background: #fff; border-radius: 14px; padding: 28px; margin-bottom: 20px; border: 1px solid #dfe4f0; }
+.next-step .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #1a6bff; font-weight: 700; margin-bottom: 12px; }
+.next-step h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+.next-step p { color: #5c6480; margin-bottom: 20px; max-width: 520px; }
+.btn { display: inline-block; padding: 12px 28px; background: #1a6bff; color: #fff; border-radius: 10px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: background 0.15s ease; }
+.btn:hover { background: #0050e0; }
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card { background: #fff; border-radius: 14px; padding: 22px; border: 1px solid #dfe4f0; }
+.stat-card .num { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: #0c1222; }
+.stat-card .desc { font-size: 13px; color: #5c6480; margin-top: 2px; }
+.stat-card:first-child .num { color: #1a6bff; }
+.recent { background: #fff; border-radius: 14px; padding: 28px; border: 1px solid #dfe4f0; }
+.recent h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+.recent-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #f0f2f8; }
+.recent-item:last-child { border-bottom: none; }
+.recent-item .company { font-weight: 600; }
+.recent-item .role { color: #5c6480; font-size: 14px; }
+.recent-item .score { font-weight: 700; color: #1a6bff; font-size: 15px; }
+.tag { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; background: #edf1fc; color: #1a6bff; }
+.tag.green { background: #e8f5ec; color: #1a8a42; }
+.tag.gray { background: #f0f2f8; color: #5c6480; }
+.info { font-size: 12px; color: #9ca0ab; text-align: center; padding: 32px; }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="brand"><span>career</span>-ops</div><nav><a class="active" href="#">Overview</a><a href="#">Jobs</a><a href="#">Tracker</a><a href="#">Profile</a></nav></div>
+<div class="container">
+<div class="hero"><h1>Good morning</h1><p><strong>3 new jobs</strong> matched your criteria since yesterday</p></div>
+<div class="next-step"><div class="label">Suggested next step</div><h2>Review 12 unscreened jobs</h2><p>You have 12 new jobs from your latest scan that haven't been evaluated yet.</p><button class="btn">Start reviewing</button></div>
+<div class="stats-row"><div class="stat-card"><div class="num">247</div><div class="desc">Jobs scanned</div></div><div class="stat-card"><div class="num">18</div><div class="desc">Applications sent</div></div><div class="stat-card"><div class="num">4.2</div><div class="desc">Avg match score</div></div></div>
+<div class="recent"><h3>Recent evaluations</h3>
+<div class="recent-item"><div><div class="company">Stripe</div><div class="role">Senior Product Manager</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag green">Applied</span><span class="score">4.6</span></div></div>
+<div class="recent-item"><div><div class="company">Notion</div><div class="role">Head of AI Products</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag">Evaluated</span><span class="score">4.3</span></div></div>
+<div class="recent-item"><div><div class="company">Linear</div><div class="role">Engineering Manager</div></div><div style="display:flex;gap:8px;align-items:center;"><span class="tag gray">Skipped</span><span class="score">2.8</span></div></div>
+</div></div>
+<div class="info">Refined 1: Subtle Electric -- DM Sans, #1a6bff accent, blue-tinted surfaces, clean but warmer blue</div>
+</body></html>

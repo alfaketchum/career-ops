@@ -398,13 +398,31 @@ process_offer() {
   fi
 
   local exit_code=0
-  claude -p \
-    --model "$model" \
-    --dangerously-skip-permissions \
-    --append-system-prompt-file "$resolved_prompt" \
-    "${tool_args[@]}" \
-    -- "$prompt" \
-    > "$log_file" 2>&1 || exit_code=$?
+  local stream_args=()
+  if [[ "${STREAM_LOG:-0}" == "1" && "$SCREEN_MODE" != "true" ]]; then
+    stream_args=(--output-format stream-json --verbose)
+  fi
+  local live_log="$PROJECT_DIR/batch/deep-pass-live.log"
+  if [[ "${STREAM_LOG:-0}" == "1" && "$SCREEN_MODE" != "true" ]]; then
+    printf '\n=== worker #%s %s (report %s) ===\n' "$id" "$url" "$report_num" >> "$live_log"
+    # Pipe stream-json to both the per-offer log and the live tail file
+    claude -p \
+      --model "$model" \
+      --dangerously-skip-permissions \
+      --append-system-prompt-file "$resolved_prompt" \
+      "${stream_args[@]}" \
+      "${tool_args[@]}" \
+      -- "$prompt" \
+      2>&1 | tee -a "$live_log" > "$log_file" || exit_code=$?
+  else
+    claude -p \
+      --model "$model" \
+      --dangerously-skip-permissions \
+      --append-system-prompt-file "$resolved_prompt" \
+      "${tool_args[@]}" \
+      -- "$prompt" \
+      > "$log_file" 2>&1 || exit_code=$?
+  fi
 
   # Cleanup resolved prompt
   rm -f "$resolved_prompt"

@@ -16,7 +16,7 @@
     "liveness": "node check-liveness.mjs",
     "scan": "node scan.mjs",
     "cache": "node cache-company.mjs",
-    "web": "node web/server.mjs"
+    "web": "node --env-file-if-exists=.env web/server.mjs"
   },
   "keywords": [
     "ai",
@@ -33,6 +33,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.89.0",
     "js-yaml": "^4.1.1",
     "playwright": "^1.58.1"
   }

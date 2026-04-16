@@ -1,0 +1,31 @@
+Mode: SCREEN (Haiku 4.5, no WebSearch, no PDF)
+WARN: Stale lock file found (PID 2192 not running). Removing.
+=== career-ops batch runner ===
+Parallel: 1 | Max retries: 2
+Input: 171 offers
+Limit: 1 (stop after processing N URLs)
+
+History: 1 URLs already light-passed (will be skipped)
+
+Pending: 1 offers
+
+--- Processing offer #2: https://boards.greenhouse.io/samsara/jobs/7592390 (report 001, attempt 1)
+    ✅ Scored: 2.5 (Samsara)
+
+=== Light pass complete ===
+
+pass-history: data/pass-history.tsv
+──────────────────────────────────────────────────
+  Total URLs tracked:    2
+  Light-passed:          2
+  Deep-passed:           0
+  Both passes done:      0
+  Pending deep:          2
+
+Next step: reorder the queue by priority and run deep pass:
+  node batch/sort-queue.mjs
+  bash batch/batch-runner.sh --parallel 3 --limit 20
+
+=== Batch Summary ===
+Total: 2 | Completed: 2 | Failed: 0 | Pending: 0
+Average score: N/A/5 (2 scored)

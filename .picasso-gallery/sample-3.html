@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sample 3: Wizard Flow Light</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#fafafa;color:#18191b;line-height:1.6;font-size:15px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:#fff;border-right:1px solid #ebebed;padding:24px 0}
+.sidebar .brand{padding:0 24px 24px;font-size:17px;font-weight:700;letter-spacing:-0.03em}
+.steps{list-style:none}.steps li{padding:10px 24px;font-size:14px;color:#9498a5;display:flex;align-items:center;gap:12px}
+.steps li .dot{width:24px;height:24px;border-radius:50%;background:#ebebed;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#9498a5;flex-shrink:0}
+.steps li.done .dot{background:#00875a;color:#fff}.steps li.done{color:#18191b}
+.steps li.active{color:#18191b;font-weight:600}.steps li.active .dot{background:#0052ff;color:#fff}
+.help{position:absolute;bottom:24px;left:24px;right:24px;padding:16px;background:#f5f5f7;border-radius:12px;font-size:13px;color:#5b5e6b}
+.help strong{color:#18191b;display:block;margin-bottom:4px;font-size:14px}
+.main{margin-left:240px;padding:48px 64px;max-width:720px}
+.bc{font-size:13px;color:#9498a5;margin-bottom:32px}.bc span{color:#18191b}
+h1{font-size:28px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px}
+.sub{color:#5b5e6b;margin-bottom:32px;font-size:15px}
+.jc{background:#fff;border:1px solid #ebebed;border-radius:14px;padding:24px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;transition:border-color .15s}
+.jc:hover{border-color:#0052ff}
+.jc .co{font-weight:600;font-size:16px;margin-bottom:2px}.jc .ro{color:#5b5e6b;font-size:14px}
+.jc .meta{display:flex;gap:8px;margin-top:8px}
+.pill{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600;background:#f0f0f2;color:#5b5e6b}
+.pill.sc{background:#e8f0fe;color:#0052ff}.pill.lv{background:#e6f4ea;color:#137333}
+.ra{color:#9498a5;font-size:20px}
+.actions{display:flex;gap:12px;margin-top:28px}
+.bp{padding:12px 28px;background:#0052ff;color:#fff;border-radius:24px;font-weight:600;font-size:14px;border:none}
+.bg{padding:12px 28px;background:transparent;color:#5b5e6b;border-radius:24px;font-weight:500;font-size:14px;border:1px solid #ebebed}
+.pb{margin-top:48px;display:flex;align-items:center;gap:8px}
+.pb .track{flex:1;height:4px;background:#ebebed;border-radius:2px;overflow:hidden}
+.pb .fill{height:100%;width:35%;background:#0052ff;border-radius:2px}
+.pb .label{font-size:13px;color:#9498a5}
+.info{font-size:12px;color:#b0b3bc;padding:32px 0 32px 240px;text-align:center}
+</style></head><body>
+<div class="sidebar"><div class="brand">career-ops</div>
+<ul class="steps">
+<li class="done"><span class="dot">&#10003;</span> Set up profile</li>
+<li class="done"><span class="dot">&#10003;</span> Add your CV</li>
+<li class="active"><span class="dot">3</span> Review jobs</li>
+<li><span class="dot">4</span> Generate CVs</li>
+<li><span class="dot">5</span> Apply</li>
+</ul>
+<div class="help"><strong>Need help?</strong>Press ? anytime for keyboard shortcuts</div>
+</div>
+<div class="main">
+<div class="bc">Overview / <span>Review jobs</span></div>
+<h1>Review your matched jobs</h1>
+<p class="sub">We found 12 new jobs that match your profile. Review each one and select the best.</p>
+<div class="jc"><div><div class="co">Stripe</div><div class="ro">Senior Product Manager, AI</div><div class="meta"><span class="pill sc">4.6 match</span><span class="pill lv">Active</span><span class="pill">Greenhouse</span></div></div><div class="ra">&rsaquo;</div></div>
+<div class="jc"><div><div class="co">Notion</div><div class="ro">Head of Applied AI</div><div class="meta"><span class="pill sc">4.3 match</span><span class="pill lv">Active</span><span class="pill">Lever</span></div></div><div class="ra">&rsaquo;</div></div>
+<div class="jc"><div><div class="co">Figma</div><div class="ro">Product Lead, AI Features</div><div class="meta"><span class="pill sc">3.9 match</span><span class="pill lv">Active</span><span class="pill">Ashby</span></div></div><div class="ra">&rsaquo;</div></div>
+<div class="actions"><button class="bp">Select all high-match</button><button class="bg">Skip for now</button></div>
+<div class="pb"><div class="track"><div class="fill"></div></div><span class="label">Step 3 of 5</span></div>
+</div>
+<div class="info">Sample 3: Wizard Flow Light &middot; Sidebar steps &middot; Progressive disclosure &middot; One task at a time</div>
+</body></html>

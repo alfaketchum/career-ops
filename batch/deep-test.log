@@ -1,0 +1,41 @@
+WARN: Stale lock file found (PID 4076 not running). Removing.
+=== career-ops batch runner ===
+Parallel: 1 | Max retries: 2
+Input: 171 offers
+Limit: 1 (stop after processing N URLs)
+
+Pending: 1 offers
+
+--- Processing offer #20: https://remoteok.com/remote-jobs/remote-fpa-analyst-wisetack-918860 (report 001, attempt 1)
+batch/batch-runner.sh: line 440: bc: command not found
+    ✅ Completed (score: 1.8, report: 001)
+
+=== Merging tracker additions ===
+📊 Existing: 0 entries, max #0
+📥 Found 1 pending additions
+➕ Add #1: Wisetack — FP&A Analyst (1.8/5)
+
+✅ Moved 1 TSVs to merged/
+
+📊 Summary: +1 added, 🔄0 updated, ⏭️0 skipped
+
+=== Verifying pipeline integrity ===
+
+📊 Checking 1 entries in applications.md
+
+✅ All statuses are canonical
+✅ No exact duplicates found
+✅ All report links valid
+✅ All scores valid
+✅ All rows properly formatted
+✅ No pending TSVs
+✅ No bold in scores
+
+==================================================
+📊 Pipeline Health: 0 errors, 0 warnings
+🟢 Pipeline is clean!
+
+=== Batch Summary ===
+Total: 171 | Completed: 171 | Failed: 0 | Pending: 0
+Average score: N/A/5 (171 scored)
+batch/batch-runner.sh: line 744: unexpected EOF while looking for matching `"'

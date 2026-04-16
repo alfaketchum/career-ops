@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refined Gallery: Electric Blue Variations</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'DM Sans', sans-serif; background: #0a1029; color: #e4eaf6; padding: 40px; }
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; margin-bottom: 8px; text-align: center; }
+h1 span { color: #3b8fff; }
+.subtitle { text-align: center; color: #7a8ba8; margin-bottom: 40px; font-size: 15px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; max-width: 1100px; margin: 0 auto; }
+.card { background: #0f1d35; border: 1px solid #1c2d4a; border-radius: 12px; overflow: hidden; transition: border-color 0.15s ease; }
+.card:hover { border-color: #3b8fff; }
+.card iframe { width: 100%; height: 280px; border: none; pointer-events: none; transform-origin: top left; }
+.card-info { padding: 16px 20px; }
+.card-info .number { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #3b8fff; margin-bottom: 4px; }
+.card-info h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; color: #e4eaf6; }
+.card-info p { font-size: 13px; color: #7a8ba8; line-height: 1.4; }
+.card-info .tokens { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.card-info .token { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: rgba(59, 143, 255, 0.12); color: #5aa3ff; }
+.spectrum { max-width: 1100px; margin: 40px auto 0; text-align: center; }
+.spectrum-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+.spectrum-label { font-size: 12px; color: #7a8ba8; text-transform: uppercase; letter-spacing: 0.08em; }
+.spectrum-track { flex: 1; height: 4px; margin: 0 20px; background: linear-gradient(90deg, #1a6bff, #0055ff, #3b8fff, #1446c2, #0055ff); border-radius: 2px; }
+</style>
+</head>
+<body>
+<h1>Electric <span>Blue</span> Variations</h1>
+<p class="subtitle">5 directions based on Sample 1 (Clean Coinbase), pushed toward "more blue, more electric"</p>
+
+<div class="grid">
+  <div class="card">
+    <iframe src="sample-refined-1.html"></iframe>
+    <div class="card-info">
+      <div class="number">Refined 1</div>
+      <h3>Subtle Electric</h3>
+      <p>Clean Coinbase base with warmer blue accent. Blue-tinted surfaces, restrained energy. The most conservative option.</p>
+      <div class="tokens"><span class="token">#1a6bff</span><span class="token">Light mode</span><span class="token">Blue tint bg</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <iframe src="sample-refined-2.html"></iframe>
+    <div class="card-info">
+      <div class="number">Refined 2</div>
+      <h3>Charged Blue</h3>
+      <p>All stat numbers in blue, blue top-line accent on next-step card, CTA hover glow. Bolt icon in brand. Noticeably electric.</p>
+      <div class="tokens"><span class="token">#2563ff</span><span class="token">Light mode</span><span class="token">Glow hover</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <iframe src="sample-refined-3.html"></iframe>
+    <div class="card-info">
+      <div class="number">Refined 3</div>
+      <h3>Neon Surge</h3>
+      <p>Dark navy mode with electric blue as the dominant light source. Glowing CTA, blue gradient line accents. Dramatic.</p>
+      <div class="tokens"><span class="token">#3b8fff</span><span class="token">Dark mode</span><span class="token">Neon glow</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <iframe src="sample-refined-4.html"></iframe>
+    <div class="card-info">
+      <div class="number">Refined 4</div>
+      <h3>Blue Wash</h3>
+      <p>Saturated blue navbar, blue-tinted page background, one solid-blue stat card. Deep royal blue. Blue everywhere but still light mode.</p>
+      <div class="tokens"><span class="token">#1446c2</span><span class="token">Blue navbar</span><span class="token">Blue card</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <iframe src="sample-refined-5.html"></iframe>
+    <div class="card-info">
+      <div class="number">Refined 5</div>
+      <h3>Full Voltage</h3>
+      <p>Blue hero banner with inline stats, compact next-step row layout, blue logomark. Maximum blue surface area while staying clean.</p>
+      <div class="tokens"><span class="token">#0055ff</span><span class="token">Hero banner</span><span class="token">Max blue</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="spectrum">
+  <div class="spectrum-bar">
+    <span class="spectrum-label">Subtle</span>
+    <div class="spectrum-track"></div>
+    <span class="spectrum-label">Maximum</span>
+  </div>
+  <p style="color:#4a5a75; font-size:12px; margin-top:8px;">R1 -------- R2 -------- R4 -------- R5 -------- R3</p>
+</div>
+</body>
+</html>

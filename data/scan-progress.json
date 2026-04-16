@@ -1,0 +1,27 @@
+{
+  "status": "running",
+  "mode": "scored-verify",
+  "startedAt": "2026-04-15T05:33:36.783Z",
+  "total": 170,
+  "checked": 85,
+  "active": 83,
+  "expired": 2,
+  "current": "Director of Financial Planning & Analysis (FP&A) — Director of Financial Planning & Analysis (FP&A)",
+  "recentActive": [
+    "✓ Senior Director FP&A - Growth — Senior Director FP&A - Growth",
+    "✓ Director, FP&A, Employer Solutions — Director, FP&A, Employer Solutions",
+    "✓ VP of Finance/Head of FP&A — VP of Finance/Head of FP&A",
+    "✓ Regional FP&A Leader — Regional FP&A Leader",
+    "✓ Director of FP&A — Director of FP&A",
+    "✓ Corporate FP&A Manager — Corporate FP&A Manager",
+    "✓ Sr. Director, FP&A — Sr. Director, FP&A",
+    "✓ Credit Analyst — Credit Analyst",
+    "✓ Finance Expert - Credit Analyst — Finance Expert - Credit Analyst",
+    "✓ Compliance & Credit Analyst — Compliance & Credit Analyst"
+  ],
+  "recentExpired": [
+    "✗ Exodus Movement Inc — pattern matched: this job (listing |post )?is closed",
+    "✗ Newsela — pattern matched: this job (listing |post )?is closed"
+  ],
+  "finishedAt": null
+}

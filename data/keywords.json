@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-04-16",
+  "source_hashes": {
+    "cv": "f85db3ab2816066257c216702cd4bf38",
+    "profile": "5530127cc23a9f10f7f3f0a92936091c",
+    "digest": "e010c7ea57796dde3b78bd6a2f49de74"
+  },
+  "keywords": [
+    {
+      "term": "Financial Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Credit Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Business Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Strategy Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Business/Strategy Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Portfolio Analyst / Risk Analyst",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Business Development / Partnerships",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Operations / Program Manager",
+      "source": "profile",
+      "enabled": true
+    },
+    {
+      "term": "Business Strategy Manager",
+      "source": "cv",
+      "enabled": true
+    },
+    {
+      "term": "Co-Founder / Business Lead",
+      "source": "cv",
+      "enabled": true
+    },
+    {
+      "term": "Consulting Portfolio Manager",
+      "source": "cv",
+      "enabled": true
+    },
+    {
+      "term": "Senior Associate Credit Analyst",
+      "source": "cv",
+      "enabled": true
+    },
+    {
+      "term": "Corporate Finance Analyst",
+      "source": "cv",
+      "enabled": true
+    }
+  ],
+  "user_added": []
+}
