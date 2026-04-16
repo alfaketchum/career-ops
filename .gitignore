@@ -54,3 +54,4 @@ batch/batch-input.tsv
 batch/batch-input-deep.tsv
 batch/batch-state.tsv
 package-lock.json
+*.backup

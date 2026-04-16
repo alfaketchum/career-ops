@@ -6,6 +6,7 @@
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
+import yaml from 'js-yaml';
 
 // ── helpers ─────────────────────────────────────────────────────
 
@@ -408,26 +409,63 @@ export function getScannerStatus(careerOpsPath) {
   const authDir = join(careerOpsPath, '.playwright-auth');
   const authEnabled = existsSync(authDir);
 
-  // Count LinkedIn URLs added by the authenticated scanner
-  // (linkedin-scan.mjs always tags portal as "LinkedIn — ...")
   const stats = {
     authEnabled,
     linkedInUrlsAdded: 0,
     lastLinkedInScan: '',
     webSearchUrlsAdded: 0,
+    // Portals config summary (what each mode will actually do)
+    trackedCompaniesCount: 0,
+    searchQueriesCount: 0,
+    linkedinSearchesCount: 0,
+    hasApiKey: false,
+    // Last scan run summary
+    lastScan: null, // { date, added, sources: [...] }
   };
 
+  // ── Parse portals.yml to count what each mode reads ──
+  const portalsPath = join(careerOpsPath, 'portals.yml');
+  if (existsSync(portalsPath)) {
+    try {
+      const cfg = yaml.load(readFileSync(portalsPath, 'utf8')) || {};
+      const tracked = Array.isArray(cfg.tracked_companies) ? cfg.tracked_companies : [];
+      stats.trackedCompaniesCount = tracked.filter(c => c && c.enabled !== false).length;
+
+      const queries = Array.isArray(cfg.search_queries) ? cfg.search_queries : [];
+      stats.searchQueriesCount = queries.filter(q => q && q.enabled !== false).length;
+
+      const liSearches = cfg.linkedin && Array.isArray(cfg.linkedin.searches) ? cfg.linkedin.searches : [];
+      stats.linkedinSearchesCount = liSearches.filter(s => s && s.enabled !== false).length;
+    } catch {
+      // malformed YAML — leave counts at 0
+    }
+  }
+
+  // ── Check for Anthropic API key (used by WebSearch mode) ──
+  const envPath = join(careerOpsPath, '.env');
+  if (existsSync(envPath)) {
+    try {
+      const env = readFileSync(envPath, 'utf8');
+      stats.hasApiKey = /ANTHROPIC_API_KEY\s*=\s*\S+/.test(env);
+    } catch {}
+  }
+  if (!stats.hasApiKey && process.env.ANTHROPIC_API_KEY) {
+    stats.hasApiKey = true;
+  }
+
+  // ── Scan-history breakdown ──
   const scanPath = join(careerOpsPath, 'data', 'scan-history.tsv');
   if (!existsSync(scanPath)) return stats;
   const content = readFileSync(scanPath, 'utf8');
-  const lines = content.split('\n');
-  for (let i = 1; i < lines.length; i++) {
-    const f = lines[i].split('\t');
+  const lines = content.split('\n').filter(Boolean);
+
+  // Count LinkedIn + WebSearch adds across all history
+  const dataLines = lines.slice(1); // skip header
+  for (const line of dataLines) {
+    const f = line.split('\t');
     if (f.length < 6) continue;
     const [, date, portal, , , status] = f;
     if (status !== 'added') continue;
-    // linkedin-scan.mjs portals always include " (Remote)" suffix and use em-dash;
-    // WebSearch portals from /career-ops scan use "site:linkedin.com" or just "LinkedIn — ... Remote" (no parens)
     if (portal && /^LinkedIn — .* \(Remote\)/.test(portal)) {
       stats.linkedInUrlsAdded++;
       if (date > stats.lastLinkedInScan) stats.lastLinkedInScan = date;
@@ -435,6 +473,30 @@ export function getScannerStatus(careerOpsPath) {
       stats.webSearchUrlsAdded++;
     }
   }
+
+  // Last scan summary — group by the most recent date
+  if (dataLines.length > 0) {
+    let latestDate = '';
+    for (const line of dataLines) {
+      const f = line.split('\t');
+      if (f.length < 6) continue;
+      if (f[1] > latestDate) latestDate = f[1];
+    }
+    if (latestDate) {
+      const sourcesSeen = new Set();
+      let added = 0;
+      for (const line of dataLines) {
+        const f = line.split('\t');
+        if (f.length < 6) continue;
+        if (f[1] !== latestDate) continue;
+        if (f[5] !== 'added') continue;
+        added++;
+        if (f[2]) sourcesSeen.add(f[2].startsWith('site:') ? 'websearch' : (f[2].startsWith('LinkedIn') ? 'linkedin' : 'api'));
+      }
+      stats.lastScan = { date: latestDate, added, sources: Array.from(sourcesSeen) };
+    }
+  }
+
   return stats;
 }
 

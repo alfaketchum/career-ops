@@ -17,6 +17,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, createWriteStream, o
 import { join, dirname, extname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, spawnSync } from 'child_process';
+import yaml from 'js-yaml';
 import {
   parseApplications,
   parseJobs,
@@ -112,6 +113,7 @@ function isScanRunning() {
 // ── liveness check process tracking ────────────────────────────
 
 let livenessProc = null;
+let livenessLog = '';
 
 function isLivenessRunning() {
   return livenessProc != null && livenessProc.exitCode == null;
@@ -572,13 +574,15 @@ const server = createServer((req, res) => {
       if (isLivenessRunning()) {
         return sendJSON(res, { ok: false, error: 'A liveness check is already running.' }, 409);
       }
-      // Spawn a node script that reads jobs.tsv, checks liveness via Playwright, updates jobs.tsv
       try {
+        livenessLog = '';
         livenessProc = spawn('node', ['check-liveness-jobs.mjs'], {
           cwd: careerOpsPath,
-          stdio: 'ignore',
+          stdio: ['ignore', 'pipe', 'pipe'],
           detached: false,
         });
+        livenessProc.stdout.on('data', d => { livenessLog += d.toString(); });
+        livenessProc.stderr.on('data', d => { livenessLog += d.toString(); });
         livenessProc.on('exit', () => { setTimeout(() => { livenessProc = null; }, 2000); });
         return sendJSON(res, { ok: true, pid: livenessProc.pid });
       } catch (err) {
@@ -587,7 +591,38 @@ const server = createServer((req, res) => {
     }
 
     if (path === '/api/liveness-status') {
-      return sendJSON(res, { running: isLivenessRunning() });
+      // Parse progress from log — script prints "[N/M]" in every result line
+      // and "Liveness check: M URLs to check" at the start.
+      const log = livenessLog;
+      let total = 0, checked = 0, active = 0, expired = 0, uncertain = 0;
+      if (log) {
+        const startMatch = log.match(/Liveness check:\s*(\d+)\s*URLs to check/);
+        if (startMatch) total = parseInt(startMatch[1], 10);
+        // Find the last [N/M] progress marker
+        const progressMatches = [...log.matchAll(/\[(\d+)\/(\d+)\]/g)];
+        if (progressMatches.length > 0) {
+          const last = progressMatches[progressMatches.length - 1];
+          checked = parseInt(last[1], 10);
+          if (!total) total = parseInt(last[2], 10);
+        }
+        // Count per-result symbols across all log lines
+        active = (log.match(/^\s*\u2713\s*\[/gm) || []).length;
+        expired = (log.match(/^\s*\u2717\s*\[/gm) || []).length;
+        uncertain = (log.match(/^\s*[?!]\s*\[/gm) || []).length;
+        // If "Done:" line present, prefer its counts (more accurate)
+        const doneMatch = log.match(/Done:\s*(\d+)\s*active,\s*(\d+)\s*expired,\s*(\d+)\s*uncertain\s*\((\d+)\s*checked\)/);
+        if (doneMatch) {
+          active = parseInt(doneMatch[1], 10);
+          expired = parseInt(doneMatch[2], 10);
+          uncertain = parseInt(doneMatch[3], 10);
+          checked = parseInt(doneMatch[4], 10);
+        }
+      }
+      return sendJSON(res, {
+        running: isLivenessRunning(),
+        log: log.slice(-2000),
+        progress: { total, checked, active, expired, uncertain },
+      });
     }
 
     if (path === '/api/scan-stats') {
@@ -628,6 +663,67 @@ const server = createServer((req, res) => {
       return sendJSON(res, { cv, profile, portals, keywords, complete: cv && profile && portals && keywords });
     }
 
+    // ── Current values for each onboarding step (used by revisit mode) ──
+    if (path === '/api/setup/values') {
+      const values = {
+        cv: { exists: false, content: '' },
+        profile: { exists: false, name: '', email: '', phone: '', location: '', targetRoles: '', salaryRange: '' },
+        portals: { exists: false, trackedCompanies: 0, searchQueries: 0, linkedinSearches: 0 },
+        keywords: { exists: false, count: 0, enabledCount: 0, generatedAt: '' },
+      };
+
+      // CV
+      const cvPath = join(careerOpsPath, 'cv.md');
+      if (existsSync(cvPath)) {
+        values.cv.exists = true;
+        try { values.cv.content = readFileSync(cvPath, 'utf8'); } catch {}
+      }
+
+      // Profile
+      const profilePath = join(careerOpsPath, 'config', 'profile.yml');
+      if (existsSync(profilePath)) {
+        values.profile.exists = true;
+        try {
+          const p = yaml.load(readFileSync(profilePath, 'utf8')) || {};
+          const c = p.candidate || {};
+          values.profile.name = c.full_name || '';
+          values.profile.email = c.email || '';
+          values.profile.phone = c.phone || '';
+          values.profile.location = c.location || '';
+          const primary = p.target_roles?.primary || [];
+          values.profile.targetRoles = Array.isArray(primary) ? primary.join(', ') : '';
+          values.profile.salaryRange = p.compensation?.target_range || '';
+        } catch {}
+      }
+
+      // Portals summary
+      const portalsPath = join(careerOpsPath, 'portals.yml');
+      if (existsSync(portalsPath)) {
+        values.portals.exists = true;
+        try {
+          const p = yaml.load(readFileSync(portalsPath, 'utf8')) || {};
+          values.portals.trackedCompanies = Array.isArray(p.tracked_companies) ? p.tracked_companies.length : 0;
+          values.portals.searchQueries = Array.isArray(p.search_queries) ? p.search_queries.length : 0;
+          values.portals.linkedinSearches = p.linkedin?.searches?.length || 0;
+        } catch {}
+      }
+
+      // Keywords summary
+      const kwPath = join(careerOpsPath, 'data', 'keywords.json');
+      if (existsSync(kwPath)) {
+        values.keywords.exists = true;
+        try {
+          const kw = JSON.parse(readFileSync(kwPath, 'utf8'));
+          const all = [...(kw.keywords || []), ...(kw.user_added || [])];
+          values.keywords.count = all.length;
+          values.keywords.enabledCount = all.filter(k => k.enabled).length;
+          values.keywords.generatedAt = kw.generated_at || '';
+        } catch {}
+      }
+
+      return sendJSON(res, values);
+    }
+
     if (path === '/api/setup/cv' && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => { body += chunk.toString(); if (body.length > 500000) req.destroy(); });
@@ -653,6 +749,56 @@ const server = createServer((req, res) => {
           if (!name) return sendJSON(res, { ok: false, error: 'Name is required' }, 400);
 
           const roles = (targetRoles || '').split(',').map(r => r.trim()).filter(Boolean);
+          const profilePath = join(careerOpsPath, 'config', 'profile.yml');
+          const configDir = join(careerOpsPath, 'config');
+          if (!existsSync(configDir)) mkdirSync(configDir, { recursive: true });
+
+          // MERGE into existing YAML when present (preserves archetypes, narrative, etc.)
+          // When no file exists, fall back to the default template.
+          if (existsSync(profilePath)) {
+            let existing = {};
+            try {
+              existing = yaml.load(readFileSync(profilePath, 'utf8')) || {};
+            } catch {
+              existing = {};
+            }
+
+            // Update only the fields the wizard controls
+            existing.candidate = {
+              ...(existing.candidate || {}),
+              full_name: name,
+              email: email || '',
+              phone: phone || '',
+              location: location || '',
+            };
+
+            if (roles.length > 0) {
+              existing.target_roles = {
+                ...(existing.target_roles || {}),
+                primary: roles,
+              };
+              // Regenerate archetypes from roles ONLY if none exist yet
+              if (!existing.target_roles.archetypes || existing.target_roles.archetypes.length === 0) {
+                existing.target_roles.archetypes = roles.map((r, i) => ({
+                  name: r,
+                  level: 'Mid-Senior',
+                  fit: i === 0 ? 'primary' : i < 3 ? 'primary' : 'secondary',
+                }));
+              }
+            }
+
+            existing.compensation = {
+              ...(existing.compensation || {}),
+              target_range: salaryRange || (existing.compensation?.target_range || 'Negotiable'),
+            };
+
+            // Write back, preserving structure. Comments are lost (acceptable tradeoff).
+            const serialized = yaml.dump(existing, { lineWidth: 120, noRefs: true, quotingType: '"' });
+            writeFileSync(profilePath, serialized, 'utf8');
+            return sendJSON(res, { ok: true, roles, merged: true });
+          }
+
+          // First-time setup: use the template structure
           const archetypes = roles.map((r, i) => {
             const fit = i === 0 ? 'primary' : i < 3 ? 'primary' : 'secondary';
             return `    - name: "${r}"\n      level: "Mid-Senior"\n      fit: "${fit}"`;
@@ -691,10 +837,8 @@ location:
   timezone: ""
   visa_status: ""
 `;
-          const configDir = join(careerOpsPath, 'config');
-          if (!existsSync(configDir)) mkdirSync(configDir, { recursive: true });
-          writeFileSync(join(careerOpsPath, 'config', 'profile.yml'), yml, 'utf8');
-          return sendJSON(res, { ok: true, roles });
+          writeFileSync(profilePath, yml, 'utf8');
+          return sendJSON(res, { ok: true, roles, merged: false });
         } catch (err) {
           return sendJSON(res, { ok: false, error: err.message }, 400);
         }
@@ -733,6 +877,71 @@ location:
 
         writeFileSync(destPath, content, 'utf8');
         return sendJSON(res, { ok: true });
+      } catch (err) {
+        return sendJSON(res, { ok: false, error: err.message }, 500);
+      }
+    }
+
+    // ── Parsed view of portals.yml's search_queries + linkedin.searches ──
+    if (path === '/api/portals-queries') {
+      try {
+        const portalsPath = join(careerOpsPath, 'portals.yml');
+        if (!existsSync(portalsPath)) {
+          return sendJSON(res, { websearch: [], linkedin: [] });
+        }
+        const cfg = yaml.load(readFileSync(portalsPath, 'utf8')) || {};
+
+        // Parse search_queries — infer template + keyword from the name prefix.
+        // Expected name format: "<Template> — <Keyword>[ (Remote)]"
+        const parseName = (name) => {
+          const m = /^([^\u2014\-]+?)\s*[\u2014\-]\s*(.+?)(?:\s*\(Remote\))?\s*$/.exec(String(name || ''));
+          if (m) return { template: m[1].trim(), keyword: m[2].trim() };
+          return { template: 'custom', keyword: String(name || '').trim() };
+        };
+
+        const websearch = (cfg.search_queries || []).map(q => {
+          const { template, keyword } = parseName(q.name);
+          return {
+            template,
+            keyword,
+            name: q.name || '',
+            query: q.query || '',
+            enabled: q.enabled !== false,
+          };
+        });
+
+        const linkedin = (cfg.linkedin?.searches || []).map(s => ({
+          name: s.name || '',
+          keyword: s.q || '',
+          remote: !!s.remote,
+        }));
+
+        return sendJSON(res, { websearch, linkedin });
+      } catch (err) {
+        return sendJSON(res, { error: err.message, websearch: [], linkedin: [] }, 500);
+      }
+    }
+
+    // ── Regenerate portals.yml derived sections from keywords.json ──
+    if (path === '/api/regenerate-portals' && req.method === 'POST') {
+      try {
+        const seedTracked = url.searchParams.get('seed_tracked') === '1';
+        const force = url.searchParams.get('force') === '1';
+        const scriptArgs = ['regenerate-portals.mjs'];
+        if (seedTracked) scriptArgs.push('--seed-tracked');
+        if (force) scriptArgs.push('--force');
+        const result = spawnSync('node', scriptArgs, {
+          cwd: careerOpsPath,
+          encoding: 'utf8',
+          timeout: 20000,
+        });
+        if (result.status !== 0) {
+          return sendJSON(res, {
+            ok: false,
+            error: (result.stderr || result.stdout || 'regeneration failed').trim(),
+          }, 500);
+        }
+        return sendJSON(res, { ok: true, output: (result.stdout || '').trim() });
       } catch (err) {
         return sendJSON(res, { ok: false, error: err.message }, 500);
       }

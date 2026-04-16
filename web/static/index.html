@@ -10,58 +10,58 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="hero">
-    <div class="hero-inner">
-      <div class="hero-top">
-        <div class="brand">
-          <div class="logomark">&#9889;</div>
-          <span class="title">career-ops</span>
-          <span class="tagline">Always Be Applying</span>
+  <div class="layout">
+    <aside class="sidepanel">
+      <div class="sidepanel-brand">
+        <div class="logomark">&#9889;</div>
+        <div class="sidepanel-brand-text">
+          <div class="title">career-ops</div>
+          <div class="tagline">Always Be Applying</div>
         </div>
-        <div class="status">
+      </div>
+
+      <nav id="tabs" class="sidepanel-nav"></nav>
+
+      <div class="sidepanel-footer">
+        <div class="sidepanel-status">
           <span id="connection-status" class="dot"></span>
           <span id="last-updated">&mdash;</span>
         </div>
+        <div class="sidepanel-hint">refresh: <kbd>R</kbd></div>
       </div>
-      <div class="hero-stats" id="hero-stats">
-        <div class="hero-stat">
-          <span class="hero-stat-value">&mdash;</span>
-          <span class="hero-stat-label">Total Jobs</span>
+    </aside>
+
+    <div class="main-area">
+      <header class="hero">
+        <div class="hero-inner">
+          <div class="hero-stats" id="hero-stats">
+            <div class="hero-stat">
+              <span class="hero-stat-value">&mdash;</span>
+              <span class="hero-stat-label">Total Jobs</span>
+            </div>
+            <div class="hero-stat">
+              <span class="hero-stat-value">&mdash;</span>
+              <span class="hero-stat-label">Applied</span>
+            </div>
+            <div class="hero-stat">
+              <span class="hero-stat-value">&mdash;</span>
+              <span class="hero-stat-label">Interviews</span>
+            </div>
+            <div class="hero-stat">
+              <span class="hero-stat-value">&mdash;</span>
+              <span class="hero-stat-label">Avg Score</span>
+            </div>
+          </div>
         </div>
-        <div class="hero-stat">
-          <span class="hero-stat-value">&mdash;</span>
-          <span class="hero-stat-label">Applied</span>
-        </div>
-        <div class="hero-stat">
-          <span class="hero-stat-value">&mdash;</span>
-          <span class="hero-stat-label">Interviews</span>
-        </div>
-        <div class="hero-stat">
-          <span class="hero-stat-value">&mdash;</span>
-          <span class="hero-stat-label">Avg Score</span>
-        </div>
-      </div>
-      <nav id="tabs" class="pill-nav">
-        <a href="#/overview" data-tab="overview">Overview</a>
-        <a href="#/jobs" data-tab="jobs">Jobs</a>
-        <a href="#/keywords" data-tab="keywords">Keywords</a>
-        <a href="#/tracker" data-tab="tracker">Tracker</a>
-        <a href="#/progress" data-tab="progress">Progress</a>
-        <a href="#/profile" data-tab="profile">Profile</a>
-        <a href="#/settings" data-tab="settings">Settings</a>
-      </nav>
+      </header>
+
+      <div class="next-step" id="next-step"></div>
+
+      <main id="content">
+        <div class="loading">Loading&hellip;</div>
+      </main>
     </div>
-  </header>
-
-  <div class="next-step" id="next-step"></div>
-
-  <main id="content">
-    <div class="loading">Loading&hellip;</div>
-  </main>
-
-  <footer>
-    <span>career-ops &middot; read-only &middot; refresh: <kbd>R</kbd></span>
-  </footer>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
