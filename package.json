@@ -1,7 +1,7 @@
 {
-  "name": "career-ops",
-  "version": "1.0.0",
-  "description": "AI-powered job search pipeline built on Claude Code",
+  "name": "always-be-applying",
+  "version": "0.1.0",
+  "description": "Self-hosted AI job-search agent. Your data, your API key.",
   "scripts": {
     "doctor": "node doctor.mjs",
     "verify": "node verify-pipeline.mjs",
@@ -16,22 +16,26 @@
     "liveness": "node check-liveness.mjs",
     "scan": "node scan.mjs",
     "cache": "node cache-company.mjs",
+    "regenerate-portals": "node regenerate-portals.mjs",
     "web": "node --env-file-if-exists=.env web/server.mjs"
   },
   "keywords": [
     "ai",
     "job-search",
-    "claude-code",
-    "career",
-    "automation"
+    "agent",
+    "self-hosted",
+    "byok",
+    "anthropic",
+    "claude",
+    "career"
   ],
-  "author": "Santiago Fernández de Valderrama <hi@santifer.io> (https://santifer.io)",
-  "homepage": "https://santifer.io",
+  "author": "alfaketchum",
+  "license": "UNLICENSED",
+  "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/santifer/career-ops"
+    "url": "https://github.com/alfaketchum/always-be-applying"
   },
-  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.89.0",
     "js-yaml": "^4.1.1",

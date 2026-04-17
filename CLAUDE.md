@@ -1,10 +1,15 @@
-# Career-Ops -- AI Job Search Pipeline
+# Always Be Applying -- AI Job-Search Agent
 
 ## Origin
 
-This system was built and used by [santifer](https://santifer.io) to evaluate 740+ job offers, generate 100+ tailored CVs, and land a Head of Applied AI role. The archetypes, scoring logic, negotiation scripts, and proof point structure all reflect his specific career search in AI/automation roles.
+**Always Be Applying** is a self-hosted AI job-search agent. Users run it locally as a web app, bring their own Anthropic API key, and own all their data on disk. No SaaS, no third-party storage, no vendor lock-in.
 
-The portfolio that goes with this system is also open source: [cv-santiago](https://github.com/santifer/cv-santiago).
+It is forked from [career-ops](https://github.com/santifer/career-ops) by [santifer](https://santifer.io), who used the original system to evaluate 740+ job offers, generate 100+ tailored CVs, and land a Head of Applied AI role. The original archetypes, scoring logic, negotiation scripts, and proof point structure are the foundation. This fork extends them with:
+
+- A self-hosted web agent runtime (no Claude Code dependency required)
+- BYOK (bring your own Anthropic API key) distribution
+- Tool-contract pattern in mode files (see `modes/onboard.md`) so the same prompt works in Claude Code, OpenCode, and a backend agent runtime
+- A different product focus -- this is the trunk of a productized fork, not a contribution back upstream
 
 **It will work out of the box, but it's designed to be made yours.** If the archetypes don't match your career, the modes are in the wrong language, or the scoring doesn't fit your priorities -- just ask. You (AI Agent) can edit the user's files. The user says "change the archetypes to data engineering roles" and you do it. That's the whole point.
 
