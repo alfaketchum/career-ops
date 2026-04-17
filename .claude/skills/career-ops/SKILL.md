@@ -3,7 +3,7 @@ name: career-ops
 description: AI job search command center -- evaluate offers, generate CVs, scan portals, track applications
 user_invocable: true
 args: mode
-argument-hint: "[scan | deep | pdf | oferta | ofertas | apply | batch | tracker | pipeline | contacto | training | project | interview-prep | update]"
+argument-hint: "[onboard | scan | deep | pdf | oferta | ofertas | apply | batch | tracker | pipeline | contacto | training | project | interview-prep | update]"
 ---
 
 # career-ops -- Router
@@ -12,28 +12,38 @@ argument-hint: "[scan | deep | pdf | oferta | ofertas | apply | batch | tracker 
 
 Determine the mode from `{{mode}}`:
 
-| Input | Mode |
-|-------|------|
-| (empty / no args) | `discovery` -- Show command menu |
-| JD text or URL (no sub-command) | **`auto-pipeline`** |
-| `oferta` | `oferta` |
-| `ofertas` | `ofertas` |
-| `contacto` | `contacto` |
-| `deep` | `deep` |
-| `pdf` | `pdf` |
-| `training` | `training` |
-| `project` | `project` |
-| `tracker` | `tracker` |
-| `pipeline` | `pipeline` |
-| `apply` | `apply` |
-| `scan` | `scan` |
-| `batch` | `batch` |
-| `patterns` | `patterns` |
-| `followup` | `followup` |
+| Input | Mode | Notes |
+|-------|------|-------|
+| (empty / no args) | `discovery` -- Show command menu | |
+| JD text or URL (no sub-command) | **`auto-pipeline`** | |
+| `onboard` | `onboard` | Full setup flow (6 steps) |
+| `onboard cv` | `onboard` | Sub-step: `step=cv` |
+| `onboard profile` | `onboard` | Sub-step: `step=profile` |
+| `onboard portals` | `onboard` | Sub-step: `step=portals` |
+| `onboard narrative` | `onboard` | Sub-step: `step=narrative` (the "tell me about yourself" conversation) |
+| `onboard keywords` | `onboard` | Sub-step: `step=keywords` |
+| `onboard reset` | `onboard` | `mode=reset` -- backup + full re-run |
+| `onboard status` | `onboard` | `mode=status` -- print state, exit |
+| `oferta` | `oferta` | |
+| `ofertas` | `ofertas` | |
+| `contacto` | `contacto` | |
+| `deep` | `deep` | |
+| `pdf` | `pdf` | |
+| `training` | `training` | |
+| `project` | `project` | |
+| `tracker` | `tracker` | |
+| `pipeline` | `pipeline` | |
+| `apply` | `apply` | |
+| `scan` | `scan` | |
+| `batch` | `batch` | |
+| `patterns` | `patterns` | |
+| `followup` | `followup` | |
 
 **Auto-pipeline detection:** If `{{mode}}` is not a known sub-command AND contains JD text (keywords: "responsibilities", "requirements", "qualifications", "about the role", "we're looking for", company name + role) or a URL to a JD, execute `auto-pipeline`.
 
 If `{{mode}}` is not a sub-command AND doesn't look like a JD, show discovery.
+
+**Auto-onboarding trigger (session boot):** Before executing any mode other than `onboard` or `discovery`, check whether all canonical user files exist: `cv.md`, `config/profile.yml`, `modes/_profile.md`, `portals.yml`. If any is missing, automatically invoke `/career-ops onboard` and refuse to run the requested mode until onboarding completes. This replaces the inline onboarding logic that previously lived in `CLAUDE.md` -- the logic now lives in `modes/onboard.md` and the trigger is a one-line check here.
 
 ---
 
@@ -44,7 +54,13 @@ Show this menu:
 ```
 career-ops -- Command Center
 
-Available commands:
+Setup:
+  /career-ops onboard           → Full conversational setup (CV, profile, portals, keywords, narrative)
+  /career-ops onboard {step}    → Re-run a single step: cv | profile | portals | narrative | keywords
+  /career-ops onboard reset     → Backup canonical files, then run full setup from scratch
+  /career-ops onboard status    → Print current setup state, exit
+
+Daily use:
   /career-ops {JD}      → AUTO-PIPELINE: evaluate + report + PDF + tracker (paste text or URL)
   /career-ops pipeline  → Process pending URLs from inbox (data/pipeline.md)
   /career-ops oferta    → Evaluation only A-F (no auto PDF)
@@ -79,7 +95,9 @@ Applies to: `auto-pipeline`, `oferta`, `ofertas`, `pdf`, `contacto`, `apply`, `p
 ### Standalone modes (only their mode file):
 Read `modes/{mode}.md`
 
-Applies to: `tracker`, `deep`, `training`, `project`, `patterns`, `followup`
+Applies to: `tracker`, `deep`, `training`, `project`, `patterns`, `followup`, `onboard`
+
+`onboard` is intentionally standalone -- it CREATES the dependencies that `_shared.md` assumes exist (cv.md, profile.yml, _profile.md). Loading `_shared.md` during onboarding would be circular.
 
 ### Modes delegated to subagent:
 For `scan`, `apply` (with Playwright), and `pipeline` (3+ URLs): launch as Agent with the content of `_shared.md` + `modes/{mode}.md` injected into the subagent prompt.
@@ -93,3 +111,22 @@ Agent(
 ```
 
 Execute the instructions from the loaded mode file.
+
+---
+
+## Runtime contracts (commercial deployment boundary)
+
+Most modes are pure prompts that operate on the user's local filesystem via the
+host's tools (Read, Write, Bash). The `onboard` mode is special -- it is the
+first mode that explicitly defines its operations as **abstract tool contracts**
+in the mode file itself, so the same skill prompt can run in two runtimes:
+
+| Runtime | Tool binding |
+|---|---|
+| Claude Code (today) | Tools bind to `Read` / `Write` / `Bash` against the user's project filesystem |
+| Anthropic API + Agent SDK (commercial backend) | Tools bind to per-user database operations |
+
+The list of tool names + signatures lives in `modes/onboard.md` under `Tool contracts`.
+Other modes are encouraged to follow this pattern as the project moves toward a
+hosted offering -- defining tools at the mode-file level is what makes a single
+prompt portable across runtimes.
